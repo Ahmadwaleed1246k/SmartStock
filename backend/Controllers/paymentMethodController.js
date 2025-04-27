@@ -31,6 +31,56 @@ const addPaymentMethod = async (req, res) => {
   }
 };
 
+const getPaymentMethodsByCompID = async (req, res) => {
+  try {
+    const { compID } = req.body;
+
+    if (!compID) {
+      return res.status(400).json({ message: 'Company ID is required' });
+    }
+
+    const paymentMethods = await sequelize.query(
+      `SELECT PaymentID, PaymentMethod FROM PaymentMethods WHERE CompID = :compID`,
+      {
+        replacements: { compID },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    res.status(200).json({ paymentMethods });
+
+  } catch (error) {
+    console.error('❌ Error in getPaymentMethodsByCompID:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+// Add this method to your existing paymentMethodController.js
+
+const getPaymentMethodsByCompany = async (req, res) => {
+  try {
+    const { compID } = req.body;
+
+    if (!compID) {
+      return res.status(400).json({ message: 'Company ID is required' });
+    }
+
+    const paymentMethods = await sequelize.query(
+      `SELECT PaymentID, PaymentMethod FROM PaymentMethods WHERE CompID = :compID`,
+      { replacements: { compID } }
+    );
+
+    res.status(200).json(paymentMethods[0]);
+
+  } catch (error) {
+    console.error('Error fetching payment methods:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+
 module.exports = {
-    addPaymentMethod
+    addPaymentMethod,
+    getPaymentMethodsByCompID,
+    getPaymentMethodsByCompany
 };

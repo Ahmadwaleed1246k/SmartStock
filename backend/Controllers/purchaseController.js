@@ -1,30 +1,104 @@
 const { Purchase, sequelize } = require('../model');
-
+const { ensureLocalPurchaseAccount } = require('./accountController');
+// In purchaseController.js
 const createPurchase = async (req, res) => {
   try {
-    const { compid, supplierid, totalamount, paymentmethodid, PrdID, Quantity } = req.body;
-
-    // Validate input
-    if (!compid || !supplierid || !totalamount || !paymentmethodid || !PrdID || !Quantity) {
-      return res.status(400).json({ message: 'All fields are required: compid, supplierid, totalamount, paymentmethodid, PrdID, Quantity' });
+    const purchases = req.body;
+    if (!Array.isArray(purchases) || purchases.length === 0) {
+      return res.status(400).json({ message: 'An array of purchases is required.' });
     }
 
-    // Call the stored procedure
-    await sequelize.query(
-      'EXEC CreatePurchase @compid = :compid, @supplierid = :supplierid, @totalamount = :totalamount, @paymentmethodid = :paymentmethodid, @PrdID = :PrdID, @Quantity = :Quantity',
-      {
-        replacements: { compid, supplierid, totalamount, paymentmethodid, PrdID, Quantity }
-      }
-    );
+    const compID = purchases[0].compid;
 
-    res.status(201).json({ message: 'Purchase created successfully' });
+    // Ensure LocalPurchase account exists
+    const response = await fetch('http://localhost:5000/api/account/ensure-local-purchase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ compID })
+    });
+    
+    const localPurchaseAccount = await response.json(); 
 
+    // Generate VoucherNo
+    const [voucherResult] = await sequelize.query('SELECT MAX(VoucherNo) AS MaxVoucherNo FROM Purchases');
+    const nextVoucherNo = (voucherResult[0].MaxVoucherNo || 0) + 1;
+
+    for (const purchase of purchases) {
+      const { compid, supplierid, totalamount, PrdID, Quantity, purchasePrice, voucherDate } = purchase;
+
+      // Create Purchase
+      await sequelize.query(
+        'EXEC CreatePurchase @VoucherNo = :VoucherNo, @compid = :compid, @supplierid = :supplierid, @totalamount = :totalamount, @PrdID = :PrdID, @Quantity = :Quantity, @PurchaseDate = :voucherDate',
+        { replacements: { VoucherNo: nextVoucherNo, compid, supplierid, totalamount, PrdID, Quantity, voucherDate } }
+      );
+
+      await sequelize.query(
+        `INSERT INTO Inventory
+          (VoucherNo, VoucherType, PrdID, QtyIn, QtyOut, AcctID, UnitRate, Discount, TotalAmount, CompID, EntryDate) 
+         VALUES   
+          (:VoucherNo, :VoucherType, :PrdID, :QtyIn, 0, :SupplierID, :UnitRate, 0, :TotalAmount, :CompID, :EntryDate)`,
+        {
+          replacements: {
+            VoucherNo: nextVoucherNo,
+            VoucherType: 'Purchase',
+            PrdID: PrdID,
+            QtyIn: Quantity,
+            SupplierID: supplierid,
+            UnitRate: purchasePrice,
+            TotalAmount: totalamount,
+            CompID: compid,
+            EntryDate: new Date().toISOString().slice(0, 19).replace('T', ' ')
+
+          }
+        }
+      );
+
+      await sequelize.query(
+        'Insert into AccountDetails (VoucherNo, VoucherType, AcctID, Debit, Credit, CompID) VALUES (:VoucherNo, :VoucherType, :AcctID, :Debit, :Credit, :CompID)',
+        {
+          replacements: {
+            VoucherNo: nextVoucherNo,
+            VoucherType: 'Purchase',
+            AcctID: localPurchaseAccount.AcctID,
+            Debit: totalamount,
+            Credit: 0,
+            CompID: compid
+          }
+        }
+      );
+        
+    }
+
+    res.status(201).json({ message: 'Purchase created successfully', VoucherNo: nextVoucherNo });
   } catch (error) {
-    console.error('❌ Error in createPurchase:', error);
+    console.error('Error creating purchase:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
 
-module.exports = {
-  createPurchase
+const getAllPurchases = async (req, res) => {
+  try {
+    const [results] = await sequelize.query('SELECT * FROM Purchases');
+    res.status(200).json(results);
+  } catch (error) {
+    console.error('❌ Error fetching purchases:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
 };
+
+// In purchaseController.js
+const getNextVoucherNo = async (req, res) => {
+  try {
+    const { compID } = req.body;
+    const [voucherResult] = await sequelize.query(
+      'SELECT ISNULL(MAX(VoucherNo), 0) + 1 AS nextVoucherNo FROM Purchases WHERE CompID = :compID',
+      { replacements: { compID } }
+    );
+    res.status(200).json({ nextVoucherNo: voucherResult[0].nextVoucherNo });
+  } catch (error) {
+    console.error('Error getting next voucher number:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+module.exports = { createPurchase, getAllPurchases, getNextVoucherNo };

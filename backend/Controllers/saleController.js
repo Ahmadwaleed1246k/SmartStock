@@ -2,36 +2,122 @@ const { Sale, sequelize } = require('../model');
 
 const createSale = async (req, res) => {
   try {
-    const { compid, customerid, totalamount, discount, paymentmethodid, PrdID, Quantity } = req.body;
-
-    // Validate input
-    if (!compid || !customerid || !totalamount || discount == null || !paymentmethodid || !PrdID || !Quantity) {
-      return res.status(400).json({ message: 'All fields are required: compid, customerid, totalamount, discount, paymentmethodid, PrdID, Quantity' });
+    const sales = req.body;
+    if (!Array.isArray(sales)) {
+      return res.status(400).json({ message: 'Request body must be an array of sales' });
     }
 
-    // Call the stored procedure
-    await sequelize.query(
-      `EXEC CreateSales 
-        @compid = :compid, 
-        @customerid = :customerid, 
-        @totalamount = :totalamount, 
-        @discount = :discount, 
-        @paymentmethodid = :paymentmethodid, 
-        @PrdID = :PrdID, 
-        @Quantity = :Quantity`,
-      {
-        replacements: { compid, customerid, totalamount, discount, paymentmethodid, PrdID, Quantity }
-      }
-    );
+    if (sales.length === 0) {
+      return res.status(400).json({ message: 'At least one sale is required' });
+    }
 
-    res.status(201).json({ message: 'Sale recorded successfully' });
+    const compID = sales[0].compid;
+
+    // Ensure LocalSale account exists
+    const response = await fetch('http://localhost:5000/api/account/ensure-local-sale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ compID })
+    });
+    
+    const localSaleAccount = await response.json();
+
+    // Generate VoucherNo
+    const [voucherResult] = await sequelize.query('SELECT MAX(VoucherNo) AS MaxVoucherNo FROM Sales');
+    const nextVoucherNo = (voucherResult[0].MaxVoucherNo || 0) + 1;
+
+    for (const sale of sales) {
+      const { compid, customerid, totalamount, salePrice, discount = 0, PrdID, Quantity, voucherDate } = sale;
+
+      // Create Sale
+      await sequelize.query(
+        'EXEC CreateSales @VoucherNo = :VoucherNo, @compid = :compid, @customerid = :customerid, ' +
+        '@totalamount = :totalamount, @discount = :discount, @PrdID = :PrdID, @Quantity = :Quantity, ' +
+        '@VoucherDate = :voucherDate',
+        { 
+          replacements: { 
+            VoucherNo: nextVoucherNo, 
+            compid, 
+            customerid, 
+            totalamount, 
+            discount, 
+            PrdID, 
+            Quantity, 
+            voucherDate 
+          } 
+        }
+      );
+
+      // Update Inventory (reduce stock)
+      await sequelize.query(
+        `INSERT INTO Inventory
+          (VoucherNo, VoucherType, PrdID, QtyIn, QtyOut, AcctID, UnitRate, Discount, TotalAmount, CompID, EntryDate) 
+         VALUES   
+          (:VoucherNo, :VoucherType, :PrdID, 0, :QtyOut, :CustomerID, :UnitRate, :Discount, :TotalAmount, :CompID, :EntryDate)`,
+        {
+          replacements: {
+            VoucherNo: nextVoucherNo,
+            VoucherType: 'Sale',
+            PrdID: PrdID,
+            QtyOut: Quantity,
+            CustomerID: customerid,
+            UnitRate: salePrice,
+            Discount: discount,
+            TotalAmount: totalamount,
+            CompID: compid,
+            EntryDate: new Date().toISOString().slice(0, 19).replace('T', ' ')
+          }
+        }
+      );
+
+      // Create accounting entry (credit LocalSale account)
+      await sequelize.query(
+        'INSERT INTO AccountDetails (VoucherNo, VoucherType, AcctID, Debit, Credit, CompID) ' +
+        'VALUES (:VoucherNo, :VoucherType, :AcctID, :Debit, :Credit, :CompID)',
+        {
+          replacements: {
+            VoucherNo: nextVoucherNo,
+            VoucherType: 'Sale',
+            AcctID: localSaleAccount.AcctID,
+            Debit: 0,
+            Credit: totalamount,
+            CompID: compid
+          }
+        }
+      );
+    }
+
+    res.status(201).json({ 
+      message: `${sales.length} sales recorded successfully`, 
+      VoucherNo: nextVoucherNo 
+    });
 
   } catch (error) {
     console.error('❌ Error in createSale:', error);
-    res.status(500).json({ message: 'Internal server error', error: error.message });
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
+const getNextVoucherNo = async (req, res) => {
+  try {
+    const [voucherResult] = await sequelize.query('SELECT ISNULL(MAX(VoucherNo), 0) AS MaxVoucherNo FROM Sales');
+    const nextVoucherNo = voucherResult[0].MaxVoucherNo + 1;
+    console.log('Next Voucher No:', nextVoucherNo);
+    res.status(200).json({ VoucherNo: nextVoucherNo });
+  } catch (error) {
+    console.error('❌ Error in getNextVoucherNo:', error);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
 module.exports = {
-  createSale
+  createSale,
+  getNextVoucherNo
 };

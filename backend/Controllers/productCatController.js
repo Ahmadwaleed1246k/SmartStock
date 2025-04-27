@@ -41,6 +41,79 @@ const addProductCategory = async (req, res) => {
   }
 };
 
+const getProductCategoriesByGroupID = async (req, res) => {
+  try {
+    const { GroupID, CompID } = req.body;
+
+    if (!GroupID || !CompID) {
+      return res.status(400).json({ message: 'GroupID and CompID are required' });
+    }
+
+    const result = await sequelize.query(
+      'SELECT * FROM ProductCategory WHERE GroupID = :GroupID AND CompID = :CompID',
+      {
+        replacements: { GroupID, CompID },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('❌ Error getting product categories by GroupID:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+
+const getProductCategoriesByCompID = async (req, res) => {
+  try {
+    const { compID } = req.body;
+
+    if (!compID) {
+      return res.status(400).json({ message: 'CompID is required' });
+    }
+
+    const result = await sequelize.query(
+      'SELECT * FROM ProductCategory WHERE CompID = :compID',
+      {
+        replacements: { compID },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    res.status(200).json(result);
+
+  } catch (error) {
+    console.error('❌ Error getting product categories by CompID:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+
+// In your productCatController.js
+const deleteProductCategory = async (req, res) => {
+  try {
+    const { CategoryID } = req.body;
+    
+    await sequelize.query(
+      'EXEC DeleteProductCategoryCompletely @CategoryID = :CategoryID',
+      {
+        replacements: { CategoryID },
+        type: sequelize.QueryTypes.DELETE
+      }
+    );
+    console.log('Category deleted successfully');
+    res.status(200).json({ message: 'Category deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ message: 'Failed to delete category', error: error.message });
+  }
+};
+
+// Add to your exports
 module.exports = {
-    addProductCategory
+  addProductCategory,
+  getProductCategoriesByCompID,
+  deleteProductCategory,
+  getProductCategoriesByGroupID
 };
