@@ -1,31 +1,30 @@
-// routes/accountRoutes.js
 const express = require('express');
-const {
-  addSuppliers,
-  addCustomer,
-  editAccountInfo,
-  getSuppliersByCompany,
-  deleteSupplier,
-  getCustomersByCompany,
-  deleteCustomer,
-  addCustomer2
-} = require('../Controllers/accountController');
+const {addCustomer, addSupplier, editAccountInfo, getCustomersByCompany, 
+    getSuppliersByCompany, getAccountTransactionHistory,
+     getSuppliersByCompID, ensureLocalPurchaseAccount
+    , ensureLocalSaleAccount, getPaymentAccounts, getOutstandingBalance
+, deleteSupplier, addCustomer2, deleteCustomer, getSuppliersByCompany2
+, ensureCashBankAccounts, getCashBankAccounts, ensureWalkInCustomer} = require('../Controllers/accountController')
 
 const router = express.Router();
 
-// Supplier routes
-router.post('/add-suppliers', addSuppliers);  
-router.post('/get-suppliers-by-company', getSuppliersByCompany);
-// Add to your existing routes
-router.post('/delete-supplier', deleteSupplier);
-// Customer routes
 router.post('/add-customer', addCustomer);
-// Add the new route
-router.post('/add-customer2', addCustomer2);
-router.post('/get-customers-by-company', getCustomersByCompany);
-router.post('/delete-customer', deleteCustomer);
-
-// Account management routes
+router.post('/add-suppliers', addSupplier);
 router.post('/edit-account-info', editAccountInfo);
+router.post('/get-customers-by-company', getCustomersByCompany);
+router.post('/get-suppliers-by-company', getSuppliersByCompany);
+router.post('/get-suppliers-by-company2', getSuppliersByCompany2);
+router.post('/get-suppliers-by-compID', getSuppliersByCompID);
+router.post('/ensure-local-purchase', ensureLocalPurchaseAccount);
+router.post('/ensure-local-sale', ensureLocalSaleAccount);
+router.post('/get-account-transaction-history', getAccountTransactionHistory);
+router.post('/get-payment-accounts', getPaymentAccounts);
+router.post('/get-outstanding-balance', getOutstandingBalance);
+router.post('/delete-supplier', deleteSupplier);
+router.post('/add-customer2', addCustomer2);
+router.post('/delete-customer', deleteCustomer);
+router.post('/ensure-cash-bank', ensureCashBankAccounts);
+router.post('/get-cash-bank', getCashBankAccounts);
+router.post('/ensure-walkin', ensureWalkInCustomer);
 
 module.exports = router;
