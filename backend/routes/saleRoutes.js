@@ -1,8 +1,9 @@
 const express = require('express');
-const {createSale} = require('../Controllers/saleController')
+const {createSale, getNextVoucherNo} = require('../Controllers/saleController')
 
 const router = express.Router();
 
-router.post('/addSale', createSale);
+router.post('/add-sale', createSale);
+router.post('/get-next-voucher', getNextVoucherNo);
 
 module.exports = router;
