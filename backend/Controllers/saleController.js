@@ -1,3 +1,4 @@
+const { DECIMAL } = require('sequelize');
 const { Sale, sequelize } = require('../model');
 
 const createSale = async (req, res) => {
@@ -21,14 +22,14 @@ const createSale = async (req, res) => {
     });
     
     const localSaleAccount = await response.json();
-
+    let TotalAmount = 0;
     // Generate VoucherNo
     const [voucherResult] = await sequelize.query('SELECT MAX(VoucherNo) AS MaxVoucherNo FROM Sales');
     const nextVoucherNo = (voucherResult[0].MaxVoucherNo || 0) + 1;
-
+    console.log('nextVoucherNo', nextVoucherNo);
     for (const sale of sales) {
       const { compid, customerid, totalamount, salePrice, discount = 0, PrdID, Quantity, voucherDate } = sale;
-
+      TotalAmount += sale.totalamount;
       // Create Sale
       await sequelize.query(
         'EXEC CreateSales @VoucherNo = :VoucherNo, @compid = :compid, @customerid = :customerid, ' +
@@ -70,18 +71,43 @@ const createSale = async (req, res) => {
         }
       );
 
-      // Create accounting entry (credit LocalSale account)
+      
+    }
+    
+    if (sales[0].isWalkIn) {
+      // Debit Cash/Bank, Credit LocalSale
+      try {
+        await sequelize.query(
+          `INSERT INTO AccountDetails (VoucherNo, VoucherType, AcctID, Debit, Credit, CompID)
+          VALUES (:voucherNo, 'Sale', :debitAccount, :totalAmount, 0, :compID),
+                  (:voucherNo, 'Sale', :creditAccount, 0, :totalAmount, :compID)`,
+          {
+            replacements: {
+              voucherNo: nextVoucherNo,
+              debitAccount: sales[0].paymentAccountId, //Cash/Bank
+              creditAccount: localSaleAccount.AcctID,
+              totalAmount: TotalAmount,
+              compID: compID
+            }
+          }
+        );
+        } catch (error) {
+          console.error('❌ Error in createSale:', error);
+        }
+      
+    } else {
+      // Debit Customer, Credit LocalSale
       await sequelize.query(
-        'INSERT INTO AccountDetails (VoucherNo, VoucherType, AcctID, Debit, Credit, CompID) ' +
-        'VALUES (:VoucherNo, :VoucherType, :AcctID, :Debit, :Credit, :CompID)',
+        `INSERT INTO AccountDetails (VoucherNo, VoucherType, AcctID, Debit, Credit, CompID)
+         VALUES (:voucherNo, 'Sale', :debitAccount, :totalAmount, 0, :compID),
+                (:voucherNo, 'Sale', :creditAccount, 0, :totalAmount, :compID)`,
         {
           replacements: {
-            VoucherNo: nextVoucherNo,
-            VoucherType: 'Sale',
-            AcctID: localSaleAccount.AcctID,
-            Debit: 0,
-            Credit: totalamount,
-            CompID: compid
+            voucherNo: nextVoucherNo,
+            debitAccount: sales[0].customerid,
+            creditAccount: localSaleAccount.AcctID,
+            totalAmount: TotalAmount,
+            compID: compID
           }
         }
       );
