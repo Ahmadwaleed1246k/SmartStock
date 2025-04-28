@@ -1,98 +1,182 @@
 const {Account, sequelize} = require('../model');
-const { editCompanyInfo } = require('./companyController');
+
+const getSuppliersByCompany = async (req, res) => {
+    try {
+        const { compID } = req.body;
+        console.log('Incoming request body:', compID);
+        if (!compID) {
+            return res.status(400).json({ message: 'CompID is required' });
+        }
+
+        const suppliers = await sequelize.query(
+            'SELECT * FROM Accounts WHERE CompID = :compID AND AcctType = \'Supplier\'',
+            {
+                replacements: { compID },
+                type: sequelize.QueryTypes.SELECT
+            }
+        );
+
+        res.status(200).json(suppliers);
+    } catch (error) {
+        console.error('Error fetching suppliers:', error);
+        res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+};
+
+
+const getSuppliersByCompany2 = async (req, res) => {
+  try {
+    console.log('Request received with body:', req.body);
+    const { compID } = req.body;
+
+    if (!compID) {
+      return res.status(400).json({ 
+        message: 'compID is required',
+        receivedBody: req.body 
+      });
+    }
+
+    console.log('Executing stored procedure with compID:', compID);
+    const suppliers = await sequelize.query(
+      `EXEC GetSupplierAccountsByCompany @CompanyID = :compID`,
+      {
+        replacements: { compID },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    console.log('Suppliers retrieved:', suppliers);
+    if (!suppliers || suppliers.length === 0) {
+      return res.status(404).json({ 
+        message: 'No suppliers found for this company',
+        compID: compID
+      });
+    }
+
+    res.status(200).json(suppliers);
+
+  } catch (error) {
+    console.error('❌ Detailed error in getSuppliersByCompany:', {
+      message: error.message,
+      stack: error.stack,
+      originalError: error
+    });
+    res.status(500).json({ 
+      message: 'Failed to fetch suppliers',
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
+
+const getCustomersByCompany = async (req, res) => {
+    try {
+      const { compID } = req.body;
+      const customers = await sequelize.query(
+        `SELECT * FROM Accounts 
+         WHERE CompID = :compID 
+         AND (AcctType = 'Customer' OR AcctType = 'WalkIn')`,
+        { replacements: { compID }, type: sequelize.QueryTypes.SELECT }
+      );
+      res.status(200).json(customers);
+    } catch (error) {
+        console.error('Error fetching customers:', error);
+        res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+};
 
 const addSupplier = async (req, res) => {
-    try {
-      console.log('Incoming supplier request body:', req.body);
-  
-      const { AccountName, Address, Tel, Mob, Email, CompID } = req.body;
-  
-      // Basic required field check
-      if (!AccountName || !CompID) {
-        return res.status(400).json({
-          message: 'AccountName and CompID are required fields',
-          receivedBody: req.body
-        });
-      }
-  
-      // Optional validations based on table constraints
-      if (Tel && Tel.length !== 10) {
-        return res.status(400).json({ message: 'Telephone number must be exactly 10 digits' });
-      }
-  
-      if (Mob && Mob.length !== 11) {
-        return res.status(400).json({ message: 'Mobile number must be exactly 11 digits' });
-      }
-  
-      if (Email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email)) {
-        return res.status(400).json({ message: 'Invalid email format' });
-      }
-  
-      // AcctType is hardcoded as 'Supplier'
-      const AcctType = 'Supplier';
-  
-      await sequelize.query(
-        'EXEC InsertAccount @AccountName = :AccountName, @AccountType = :AcctType, @Address = :Address, @Tel = :Tel, @Mob = :Mob, @Email = :Email, @CompID = :CompID',
-        {
-          replacements: { AccountName, AcctType, Address, Tel, Mob, Email, CompID },
-          type: sequelize.QueryTypes.INSERT
-        }
-      );
-  
-      res.status(201).json({ message: 'Supplier added successfully' });
-  
-    } catch (error) {
-      console.error('❌ Error adding supplier:', error);
-      res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-  };
+  try {
+    console.log('Incoming supplier request body:', req.body);
 
-  const addCustomer = async (req, res) => {
-    try {
-      console.log('Incoming customer request body:', req.body);
-  
-      const { AccountName, Address, Tel, Mob, Email, CompID } = req.body;
-  
-      // Basic required field check
-      if (!AccountName || !CompID) {
-        return res.status(400).json({
-          message: 'AccountName and CompID are required fields',
-          receivedBody: req.body
-        });
-      }
-  
-      // Optional validations based on table constraints
-      if (Tel && Tel.length !== 10) {
-        return res.status(400).json({ message: 'Telephone number must be exactly 10 digits' });
-      }
-  
-      if (Mob && Mob.length !== 11) {
-        return res.status(400).json({ message: 'Mobile number must be exactly 11 digits' });
-      }
-  
-      if (Email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email)) {
-        return res.status(400).json({ message: 'Invalid email format' });
-      }
-  
-      // AcctType is hardcoded as 'Supplier'
-      const AcctType = 'Customer';
-  
-      await sequelize.query(
-        'EXEC InsertAccount @AccountName = :AccountName, @AccountType = :AcctType, @Address = :Address, @Tel = :Tel, @Mob = :Mob, @Email = :Email, @CompID = :CompID',
-        {
-          replacements: { AccountName, AcctType, Address, Tel, Mob, Email, CompID },
-          type: sequelize.QueryTypes.INSERT
-        }
-      );
-  
-      res.status(201).json({ message: 'Customer added successfully' });
-  
-    } catch (error) {
-      console.error('❌ Error adding customer:', error);
-      res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-  };
+    const { AccountName, Address, Tel, Mob, Email, CompID } = req.body;
 
+    // Basic required field check
+    if (!AccountName || !CompID) {
+      return res.status(400).json({
+        message: 'AccountName and CompID are required fields',
+        receivedBody: req.body
+      });
+    }
+
+    // Optional validations based on table constraints
+    if (Tel && Tel.length !== 10) {
+      return res.status(400).json({ message: 'Telephone number must be exactly 10 digits' });
+    }
+
+    if (Mob && Mob.length !== 11) {
+      return res.status(400).json({ message: 'Mobile number must be exactly 11 digits' });
+    }
+
+    if (Email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    // AcctType is hardcoded as 'Supplier'
+    const AcctType = 'Supplier';
+
+    await sequelize.query(
+      'EXEC InsertAccount @AccountName = :AccountName, @AccountType = :AcctType, @Address = :Address, @Tel = :Tel, @Mob = :Mob, @Email = :Email, @CompID = :CompID',
+      {
+        replacements: { AccountName, AcctType, Address, Tel, Mob, Email, CompID },
+        type: sequelize.QueryTypes.INSERT
+      }
+    );
+
+    res.status(201).json({ message: 'Supplier added successfully' });
+
+  } catch (error) {
+    console.error('❌ Error adding supplier:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+
+const addCustomer = async (req, res) => {
+  try {
+    console.log('Incoming customer request body:', req.body);
+
+    const { AccountName, Address, Tel, Mob, Email, CompID } = req.body;
+
+    // Basic required field check
+    if (!AccountName || !CompID) {
+      return res.status(400).json({
+        message: 'AccountName and CompID are required fields',
+        receivedBody: req.body
+      });
+    }
+
+    // Optional validations based on table constraints
+    if (Tel && Tel.length !== 10) {
+      return res.status(400).json({ message: 'Telephone number must be exactly 10 digits' });
+    }
+
+    if (Mob && Mob.length !== 11) {
+      return res.status(400).json({ message: 'Mobile number must be exactly 11 digits' });
+    }
+
+    if (Email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    // AcctType is hardcoded as 'Supplier'
+    const AcctType = 'Customer';
+
+    await sequelize.query(
+      'EXEC InsertAccount @AccountName = :AccountName, @AccountType = :AcctType, @Address = :Address, @Tel = :Tel, @Mob = :Mob, @Email = :Email, @CompID = :CompID',
+      {
+        replacements: { AccountName, AcctType, Address, Tel, Mob, Email, CompID },
+        type: sequelize.QueryTypes.INSERT
+      }
+    );
+
+    res.status(201).json({ message: 'Customer added successfully' });
+
+  } catch (error) {
+    console.error('❌ Error adding customer:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
   const editAccountInfo = async (req, res) => {
     try {
       const { AcctID, columnName, newValue } = req.body;
@@ -123,120 +207,257 @@ const addSupplier = async (req, res) => {
       res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   };
-
-  const getSuppliersByCompany = async (req, res) => {
+  
+  const getAccountTransactionHistory = async (req, res) => {
     try {
-      console.log('Request received with body:', req.body);
+      const { AcctID, CompID, StartDate, EndDate } = req.body;
+      
+      // For suppliers
+      const [purchases] = await sequelize.query(
+        `SELECT 
+          'Purchase' AS Type,
+          pur.PurchaseDate AS Date,
+          pur.TotalAmount,
+          p.PrdName,
+          p.PrdCode,
+          pur.Quantity
+         FROM Purchases pur
+         JOIN Products p ON pur.PrdID = p.PrdID
+         WHERE pur.SupplierID = :AcctID 
+           AND pur.CompID = :CompID
+           AND pur.PurchaseDate BETWEEN :StartDate AND :EndDate`,
+        { replacements: { AcctID, CompID, StartDate, EndDate } }
+      );
+      
+      // For customers
+      const [sales] = await sequelize.query(
+        `SELECT 
+          'Sale' AS Type,
+          s.SaleDate AS Date,
+          s.TotalAmount,
+          p.PrdName,
+          p.PrdCode,
+          s.Quantity
+         FROM Sales s
+         JOIN Products p ON s.PrdID = p.PrdID
+         WHERE s.CustomerID = :AcctID 
+           AND s.CompID = :CompID
+           AND s.SaleDate BETWEEN :StartDate AND :EndDate`,
+        { replacements: { AcctID, CompID, StartDate, EndDate } }
+      );
+      
+      const result = [...purchases, ...sales].sort((a, b) => new Date(a.Date) - new Date(b.Date));
+      
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Account history error:', error);
+      res.status(500).json({ message: 'Error generating account history' });
+    }
+  };
+
+  const getSuppliersByCompID = async (req, res) => {
+    try {
       const { compID } = req.body;
   
       if (!compID) {
-        return res.status(400).json({ 
-          message: 'compID is required',
-          receivedBody: req.body 
-        });
+        return res.status(400).json({ message: 'compID is required' });
       }
   
-      console.log('Executing stored procedure with compID:', compID);
-      const suppliers = await sequelize.query(
-        `EXEC GetSupplierAccountsByCompany @CompanyID = :compID`,
+      const result = await sequelize.query(
+        `SELECT AcctID, AcctName FROM Accounts 
+         WHERE CompID = :compID AND AcctType = 'Supplier'`,
         {
           replacements: { compID },
           type: sequelize.QueryTypes.SELECT
         }
       );
   
-      console.log('Suppliers retrieved:', suppliers);
-      if (!suppliers || suppliers.length === 0) {
-        return res.status(404).json({ 
-          message: 'No suppliers found for this company',
-          compID: compID
-        });
-      }
-  
-      res.status(200).json(suppliers);
+      res.status(200).json(result);
   
     } catch (error) {
-      console.error('❌ Detailed error in getSuppliersByCompany:', {
-        message: error.message,
-        stack: error.stack,
-        originalError: error
-      });
-      res.status(500).json({ 
-        message: 'Failed to fetch suppliers',
-        error: error.message,
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
+      console.error('Error getting suppliers by CompID:', error);
+      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
+  };
+
+
+  
+
+  // In accountController.js
+  const ensureLocalPurchaseAccount = async (req, res) => {
+    try {
+      const { compID } = req.body;
+  
+      const accounts = await sequelize.query(
+        `SELECT * FROM Accounts WHERE CompID = :compID AND AcctType = 'LocalPurchase'`,
+        {
+          replacements: { compID },
+          type: sequelize.QueryTypes.SELECT
+        }
+      );
+  
+      let acctID;
+  
+      if (accounts.length === 0) {
+        const [insertResult] = await sequelize.query(
+          `INSERT INTO Accounts (AcctName, AcctType, CompID)  
+           OUTPUT INSERTED.AcctID
+           VALUES ('Local Purchase', 'LocalPurchase', :compID)`,
+          {
+            replacements: { compID },
+            type: sequelize.QueryTypes.INSERT
+          }
+        );
+        acctID = insertResult.AcctID;
+        console.log('LocalPurchase account created.');
+      } else {
+        acctID = accounts[0].AcctID;
+      }
+  
+      res.status(200).json({ success: true, AcctID: acctID });
+  
+    } catch (error) {
+      console.error('Error ensuring local purchase account:', error);
+      res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+  };
+  
+  const ensureLocalSaleAccount = async (req, res) => {
+    try {
+      const { compID } = req.body;
+  
+      const accounts = await sequelize.query(
+        `SELECT * FROM Accounts WHERE CompID = :compID AND AcctType = 'LocalSale'`,
+        {
+          replacements: { compID },
+          type: sequelize.QueryTypes.SELECT
+        }
+      );
+  
+      let acctID;
+  
+      if (accounts.length === 0) {
+        const [insertResult] = await sequelize.query(
+          `INSERT INTO Accounts (AcctName, AcctType, CompID)  
+           OUTPUT INSERTED.AcctID
+           VALUES ('Local Sale', 'LocalSale', :compID)`,
+          {
+            replacements: { compID },
+            type: sequelize.QueryTypes.INSERT
+          }
+        );
+        acctID = insertResult.AcctID;
+        console.log('LocalSale account created.');
+      } else {
+        acctID = accounts[0].AcctID;
+      }
+  
+      res.status(200).json({ success: true, AcctID: acctID });
+  
+    } catch (error) {
+      console.error('Error ensuring local sale account:', error);
+      res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+  };
+
+
+  // Add these methods to your existing accountController.js
+
+const getPaymentAccounts = async (req, res) => {
+  try {
+    const { compID } = req.body;
+    
+    const [accounts] = await sequelize.query(
+      `SELECT AcctID, AcctName, AcctType FROM Accounts 
+       WHERE CompID = :compID AND (AcctType = 'Supplier' OR AcctType = 'Customer')`,
+      { replacements: { compID } }
+    );
+
+    res.status(200).json(accounts);
+  } catch (error) {
+    console.error('Error fetching payment accounts:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
 };
 
-const addSuppliers = async (req, res) => {
+const getOutstandingBalance = async (req, res) => {
   try {
-    console.log('Session:', req.session); // Debug session
-    console.log('Request body:', req.body);
+    const { AcctID, compID } = req.body;
+    
+    console.log('Received request with:', { AcctID, compID });
 
-    const { AccountName, Address, Tel, Mob, Email } = req.body;
-    const CompID = req.session.CompID || req.body.CompID; // Try both session and body
-
-    if (!AccountName) {
+    // Validate inputs
+    if (!AcctID || !compID) {
       return res.status(400).json({ 
-        message: 'AccountName is required',
-        receivedData: { body: req.body, session: req.session }
+        success: false,
+        message: 'Both AcctID and compID are required'
       });
     }
 
-    if (!CompID) {
-      return res.status(400).json({ 
-        message: 'Company ID is required (either from session or request body)',
-        sessionData: req.session
-      });
-    }
-
-    // Validate phone numbers if provided
-    if (Tel && Tel.length !== 10) {
-      return res.status(400).json({ message: 'Telephone must be 10 digits' });
-    }
-
-    if (Mob && Mob.length !== 11) {
-      return res.status(400).json({ message: 'Mobile must be 11 digits' });
-    }
-
-    // Validate email if provided
-    if (Email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email)) {
-      return res.status(400).json({ message: 'Invalid email format' });
-    }
-
-    const [result] = await sequelize.query(
-      `INSERT INTO Accounts 
-       (AcctName, Address, Tel, Mob, Email, CompID, AcctType) 
-       VALUES (:AccountName, :Address, :Tel, :Mob, :Email, :CompID, 'Supplier')`,
+    // 1. First verify the account exists and is Supplier/Customer
+    const accountResult = await sequelize.query(
+      `SELECT AcctType FROM Accounts 
+       WHERE AcctID = :AcctID AND CompID = :compID 
+       AND (AcctType = 'Supplier' OR AcctType = 'Customer')`,
       {
-        replacements: { 
-          AccountName, 
-          Address: Address || null,
-          Tel: Tel || null,
-          Mob: Mob || null,
-          Email: Email || null,
-          CompID 
-        },
-        type: sequelize.QueryTypes.INSERT
+        replacements: { AcctID, compID },
+        type: sequelize.QueryTypes.SELECT
       }
     );
 
-    res.status(201).json({ 
-      message: 'Supplier added successfully',
-      supplierId: result
+    console.log('Account query result:', accountResult);
+
+    if (!accountResult || accountResult.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Account not found or not a Supplier/Customer'
+      });
+    }
+
+    const accountType = accountResult[0].AcctType;
+    console.log('Account type:', accountType);
+
+    // 2. Calculate the outstanding balance
+    let balanceQuery;
+    if (accountType === 'Supplier') {
+      balanceQuery = `
+        SELECT 
+          (SELECT COALESCE(SUM(TotalAmount), 0) FROM Purchases 
+          WHERE SupplierID = :AcctID AND CompID = :compID) -
+          (SELECT COALESCE(SUM(Amount), 0) FROM Payments 
+          WHERE AcctID = :AcctID AND PaymentType = 'Paid' AND CompID = :compID)
+        AS balance
+      `;
+    } else { // Customer
+      balanceQuery = `
+        SELECT 
+          (SELECT COALESCE(SUM(TotalAmount), 0) FROM Sales 
+          WHERE CustomerID = :AcctID AND CompID = :compID) -
+          (SELECT COALESCE(SUM(Amount), 0) FROM Payments 
+          WHERE AcctID = :AcctID AND PaymentType = 'Received' AND CompID = :compID)
+        AS balance
+      `;
+    }
+
+    const [balanceResult] = await sequelize.query(balanceQuery, {
+      replacements: { AcctID, compID },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    const balance = parseFloat(balanceResult?.balance) || 0;
+    console.log('Calculated balance:', balance);
+
+    return res.status(200).json({ 
+      success: true,
+      balance: balance
     });
 
   } catch (error) {
-    console.error('❌ Error adding supplier:', {
-      message: error.message,
-      stack: error.stack,
-      original: error
-    });
-    res.status(500).json({ 
-      message: 'Failed to add supplier',
-      error: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    console.error('Error calculating outstanding balance:', error);
+    return res.status(500).json({ 
+      success: false,
+      message: 'Internal server error',
+      error: error.message
     });
   }
 };
@@ -250,9 +471,9 @@ const deleteSupplier = async (req, res) => {
     }
 
     await sequelize.query(
-      'DELETE FROM Accounts WHERE AcctID = :AcctID AND AcctType = :AcctType',
+      'EXEC DeleteSupplierCompletely @AcctID = :AcctID',
       {
-        replacements: { AcctID, AcctType: 'Supplier' },
+        replacements: { AcctID },
         type: sequelize.QueryTypes.DELETE
       }
     );
@@ -267,75 +488,20 @@ const deleteSupplier = async (req, res) => {
   }
 };
 
-
-const getCustomersByCompany = async (req, res) => {
-  try {
-    console.log('Request received with body:', req.body);
-    const { compID } = req.body;
-
-    if (!compID) {
-      return res.status(400).json({ 
-        message: 'compID is required',
-        receivedBody: req.body 
-      });
-    }
-
-    console.log('Executing query with compID:', compID);
-    const customers = await sequelize.query(
-      `SELECT 
-        AcctID,
-        AcctName,
-        Address,
-        Tel,
-        Mob,
-        Email
-       FROM Accounts
-       WHERE CompID = :compID 
-       AND AcctType = 'Customer'
-       ORDER BY AcctName`,
-      {
-        replacements: { compID },
-        type: sequelize.QueryTypes.SELECT
-      }
-    );
-
-    console.log('Customers retrieved:', customers);
-    if (!customers || customers.length === 0) {
-      return res.status(404).json({ 
-        message: 'No customers found for this company',
-        compID: compID
-      });
-    }
-
-    res.status(200).json(customers);
-
-  } catch (error) {
-    console.error('❌ Detailed error in getCustomersByCompany:', {
-      message: error.message,
-      stack: error.stack,
-      originalError: error
-    });
-    res.status(500).json({ 
-      message: 'Failed to fetch customers',
-      error: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-  }
-};
-
-
 const deleteCustomer = async (req, res) => {
   try {
     const { AcctID } = req.body;
-
+    console.log('Deleting customer with ID:', AcctID);
     if (!AcctID) {
       return res.status(400).json({ message: 'Customer ID is required' });
     }
 
+   
+
     await sequelize.query(
-      'DELETE FROM Accounts WHERE AcctID = :AcctID AND AcctType = :AcctType',
+      'EXEC DeleteCustomerCompletely @AcctID = :AcctID',
       {
-        replacements: { AcctID, AcctType: 'Customer' },
+        replacements: { AcctID },
         type: sequelize.QueryTypes.DELETE
       }
     );
@@ -349,7 +515,6 @@ const deleteCustomer = async (req, res) => {
     });
   }
 };
-
 
 const getAllAccountsByCompany = async (req, res) => {
   try {
@@ -386,7 +551,6 @@ const getAllAccountsByCompany = async (req, res) => {
     });
   }
 };
-
 
 const getCustomerById = async (req, res) => {
   try {
@@ -498,24 +662,85 @@ const addCustomer2 = async (req, res) => {
 };
 
 
+// Ensure Cash and Bank accounts exist
+const ensureCashBankAccounts = async (req, res) => {
+  try {
+    const { compID } = req.body;
+    
+    // Ensure Cash Account
+    let [cash] = await sequelize.query(
+      `IF NOT EXISTS (SELECT * FROM Accounts WHERE CompID = :compID AND AcctType = 'Cash')
+       INSERT INTO Accounts (AcctName, AcctType, CompID) VALUES ('Cash', 'Cash', :compID)`,
+      { replacements: { compID } }
+    );
 
+    // Ensure Bank Account
+    let [bank] = await sequelize.query(
+      `IF NOT EXISTS (SELECT * FROM Accounts WHERE CompID = :compID AND AcctType = 'Bank')
+       INSERT INTO Accounts (AcctName, AcctType, CompID) VALUES ('Bank', 'Bank', :compID)`,
+      { replacements: { compID } }
+    );
 
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error ensuring cash/bank:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
 
+// Get Cash/Bank accounts
+const getCashBankAccounts = async (req, res) => {
+  try {
+    const { compID } = req.body;
+    const accounts = await sequelize.query(
+      `SELECT AcctID, AcctName FROM Accounts 
+       WHERE CompID = :compID AND AcctType IN ('Cash', 'Bank')`,
+      { replacements: { compID }, type: sequelize.QueryTypes.SELECT }
+    );
+    res.status(200).json(accounts);
+  } catch (error) {
+    console.error('Error fetching cash/bank:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
 
+// Ensure Walk-in Customer exists
+const ensureWalkInCustomer = async (req, res) => {
+  try {
+    const { compID } = req.body;
+    const [customer] = await sequelize.query(
+      `IF NOT EXISTS (SELECT * FROM Accounts WHERE CompID = :compID AND AcctType = 'WalkIn')
+       INSERT INTO Accounts (AcctName, AcctType, CompID) 
+       VALUES ('Walk-in Customer', 'WalkIn', :compID)`,
+      { replacements: { compID } }
+    );
+    res.status(200).json(customer);
+  } catch (error) {
+    console.error('Error ensuring walk-in customer:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
 
   
-
   module.exports = {
     addCustomer,
     addSupplier,
     editAccountInfo,
-    getSuppliersByCompany,
-    addSuppliers,
-    deleteSupplier,
     getCustomersByCompany,
+    getSuppliersByCompany,
+    getAccountTransactionHistory,
+    getSuppliersByCompID,
+    ensureLocalPurchaseAccount,
+    ensureLocalSaleAccount,
+    getPaymentAccounts,
+    getOutstandingBalance,
+    deleteSupplier,
     deleteCustomer,
     getAllAccountsByCompany,
     getCustomerById,
-    addCustomer2
-    
+    addCustomer2,
+    getSuppliersByCompany2,
+    ensureCashBankAccounts,
+    getCashBankAccounts,
+    ensureWalkInCustomer
   };
