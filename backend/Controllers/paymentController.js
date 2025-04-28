@@ -34,24 +34,25 @@ const createPayment = async (req, res) => {
     let debitAccountID, creditAccountID;
     let voucherType = 'Payment';
 
+    // Corrected payment accounting logic
     if (PaymentType === 'Received') {
-      // Receiving payment from customer
-      if (accountType === 'Customer') {
-        debitAccountID = await getLocalSaleAccountID(compID);
-        creditAccountID = AcctID;
-        voucherType = 'PaymentReceived';
-      } else {
+        // Receiving payment from customer
+        if (accountType === 'Customer') {
+        debitAccountID = PaymentMethodID; // Cash/Bank account
+        creditAccountID = AcctID; // Customer account
+        voucherType = 'Received';
+        } else {
         return res.status(400).json({ message: 'Can only receive payments from Customers' });
-      }
+        }
     } else {
-      // Making payment to supplier
-      if (accountType === 'Supplier') {
-        debitAccountID = AcctID;
-        creditAccountID = await getLocalPurchaseAccountID(compID);
-        voucherType = 'PaymentMade';
-      } else {
+        // Making payment to supplier
+        if (accountType === 'Supplier') {
+        debitAccountID = AcctID; // Supplier account
+        creditAccountID = PaymentMethodID; // Cash/Bank account
+        voucherType = 'Paid';
+        } else {
         return res.status(400).json({ message: 'Can only make payments to Suppliers' });
-      }
+        }
     }
 
     // Start transaction
@@ -59,7 +60,7 @@ const createPayment = async (req, res) => {
       // Create payment record
       await sequelize.query(
         `INSERT INTO Payments (
-          CompID, AcctID, PaymentType, Amount, PaymentMethodID, 
+          CompID, AcctID, PaymentType, Amount, CashBankAcctID, 
           VoucherNo, Reference, TransactionReference, PaymentDate
         ) VALUES (
           :compID, :AcctID, :PaymentType, :Amount, :PaymentMethodID, 
@@ -121,6 +122,8 @@ const createPayment = async (req, res) => {
   }
 };
 
+
+
 const getNextVoucherNo = async (req, res) => {
   try {
     const { compID } = req.body;
@@ -135,24 +138,7 @@ const getNextVoucherNo = async (req, res) => {
   }
 };
 
-// Helper functions
-async function getLocalSaleAccountID(compID) {
-  const [account] = await sequelize.query(
-    `SELECT AcctID FROM Accounts 
-     WHERE CompID = :compID AND AcctType = 'LocalSale'`,
-    { replacements: { compID } }
-  );
-  return account[0]?.AcctID;
-}
 
-async function getLocalPurchaseAccountID(compID) {
-  const [account] = await sequelize.query(
-    `SELECT AcctID FROM Accounts 
-     WHERE CompID = :compID AND AcctType = 'LocalPurchase'`,
-    { replacements: { compID } }
-  );
-  return account[0]?.AcctID;
-}
 
 module.exports = {
   createPayment,
