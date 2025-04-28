@@ -45,13 +45,13 @@ const PaymentForm = () => {
         setAccounts(accountsData);
 
         // Fetch payment methods
-        const methodsRes = await fetch('http://localhost:5000/api/payment-method/get-by-company', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ compID })
-        });
-        const methodsData = await methodsRes.json();
-        setPaymentMethods(methodsData);
+        const cashBankRes = await fetch('http://localhost:5000/api/account/get-cash-bank', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ compID })
+          });
+        const cashBankData = await cashBankRes.json();
+        setPaymentMethods(cashBankData);
 
       } catch (error) {
         console.error('Error initializing form:', error);
@@ -154,8 +154,8 @@ const PaymentForm = () => {
     }));
 
   const methodOptions = paymentMethods.map(method => ({
-    value: method.PaymentID,
-    label: method.PaymentMethod
+    value: method.AcctID,
+    label: method.AcctName
   }));
 
   // Custom styles for react-select components
