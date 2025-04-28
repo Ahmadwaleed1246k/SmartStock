@@ -1,11 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUserTie, FaBuilding, FaChartLine, FaSignOutAlt, FaUsers } from 'react-icons/fa';
+import { 
+    FaUserTie, 
+    FaTruck, 
+    FaUsers, 
+    FaSignOutAlt, 
+    FaTimes,
+    FaShoppingCart,
+    FaMoneyBillWave,
+    FaChartBar,
+    FaBoxes,
+    FaTags,
+    FaBox,
+    FaCreditCard
+} from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
 const Dashboard = () => {
     const [companyName, setCompanyName] = useState('');
     const [userName, setUserName] = useState('');
+    const [employees, setEmployees] = useState([]);
+    const [showEmployeesModal, setShowEmployeesModal] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [userRole, setUserRole] = useState('');
     const navigate = useNavigate();
 
@@ -13,7 +29,6 @@ const Dashboard = () => {
         const compID = sessionStorage.getItem('CompID');
         const userID = sessionStorage.getItem('UserID');
         const role = sessionStorage.getItem('UserRole');
-
         if (!compID) {
             navigate('/');
             return;
@@ -64,59 +79,66 @@ const Dashboard = () => {
         navigate('/');
     };
 
-    const handleEmployeeClick = () => {
-        // Removed the admin-only restriction here
-        navigate('/employees');
-    };
-
-    const handleSupplierClick = () => {
-        navigate('/suppliers');
-    };
-
-    const handleCustomerClick = () => {
-        navigate('/customers');
-    };
-
-    const handleSalesClick = () => {
-        console.log('Sales clicked');
-    };
 
     const sectionData = [
         { 
-            title: 'Employee', 
+            title: 'Employees', 
             icon: <FaUserTie size={30} color="#4facfe" />,
-            onClick: handleEmployeeClick,
-            description: 'Manage employee-related tasks here.'
+            onClick: () => navigate('/employees')
         },
-        { 
-            title: 'Suppliers', 
-            icon: <FaBuilding size={30} color="#00f2fe" />,
-            onClick: handleSupplierClick,
-            description: 'Manage supplier-related tasks here.'
+        {
+            title: 'Suppliers',
+            icon: <FaTruck size={30} color="#00f2fe" />,
+            onClick: () => navigate('/suppliers'),
         },
         { 
             title: 'Customers', 
             icon: <FaUsers size={30} color="#4facfe" />,
-            onClick: handleCustomerClick,
-            description: 'Manage customer-related tasks here.'
+            onClick: () => navigate('/customers')
         },
-        { 
-            title: 'Sales', 
-            icon: <FaChartLine size={30} color="#00f2fe" />,
-            onClick: handleSalesClick,
-            description: 'View sales reports and analytics.'
-        }
+        {
+            title: 'Purchase',
+            icon: <FaShoppingCart size={30} color="#00f2fe" />, 
+            onClick: () => navigate('/purchases')
+        },
+        {
+            title: 'Sale',
+            icon: <FaMoneyBillWave size={30} color="#00f2fe" />, 
+            onClick: () => navigate('/sales')
+        },
+        {
+            title: 'Reports',
+            icon: <FaChartBar size={30} color="#00f2fe" />, 
+            onClick: () => navigate('/reports')
+        },
+        {
+            title: 'Product Group',
+            icon: <FaBoxes size={30} color="#00f2fe" />, 
+            onClick: () => navigate('/product-groups')
+        },
+        {
+            title: 'Product Category',
+            icon: <FaTags size={30} color="#00f2fe" />, 
+            onClick: () => navigate('/product-category')
+        },
+        {
+            title: 'Product',
+            icon: <FaBox size={30} color="#00f2fe" />, 
+            onClick: () => navigate('/product')
+        },
+        {
+            title: 'Payment',
+            icon: <FaCreditCard size={30} color="#00f2fe" />, 
+            onClick: () => navigate('/payment')
+        },
     ];
-
     return (
         <div style={{
             fontFamily: "'Inter', sans-serif",
             background: 'linear-gradient(135deg, #0f2027, #203a43, #2c5364)',
             minHeight: '100vh',
             padding: '30px',
-            color: '#e0e0e0',
-            position: 'relative',
-            overflow: 'hidden'
+            color: '#e0e0e0'
         }}>
             {/* Animated Background Elements */}
             <div style={{
@@ -200,45 +222,13 @@ const Dashboard = () => {
                 </motion.button>
             </motion.div>
 
-            {/* Dashboard Main Content */}
-            <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                style={{
-                    padding: '30px',
-                    backgroundColor: 'rgba(15, 30, 45, 0.8)',
-                    borderRadius: '16px',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-                    backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    marginBottom: '30px',
-                    position: 'relative',
-                    zIndex: 1
-                }}
-            >
-                <h2 style={{ 
-                    marginBottom: '15px',
-                    color: '#ffffff',
-                    fontSize: '1.8em',
-                    fontWeight: '600'
-                }}>
-                    Dashboard Content
-                </h2>
-                <p style={{ 
-                    color: 'rgba(255,255,255,0.7)',
-                    fontSize: '1.1em',
-                    lineHeight: '1.6'
-                }}>
-                    This is where you can add your dashboard features and widgets.
-                </p>
-            </motion.div>
 
             {/* Section Cards */}
             <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                display: 'flex',
+                justifyContent: 'space-between',
                 gap: '25px',
+                flexWrap: 'wrap',
                 position: 'relative',
                 zIndex: 1
             }}>
@@ -253,6 +243,8 @@ const Dashboard = () => {
                             boxShadow: '0 8px 32px rgba(79, 172, 254, 0.3)'
                         }}
                         style={{
+                            flex: '1 1 30%',
+                            minWidth: '280px',
                             padding: '30px',
                             backgroundColor: 'rgba(15, 30, 45, 0.8)',
                             borderRadius: '16px',
@@ -287,11 +279,86 @@ const Dashboard = () => {
                             color: 'rgba(255,255,255,0.7)',
                             lineHeight: '1.6'
                         }}>
-                            {section.description}
+                            Manage {section.title.toLowerCase()}-related tasks here.
                         </p>
                     </motion.div>
                 ))}
             </div>
+
+            {/* Employees Modal */}
+            {showEmployeesModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1000
+                }}>
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        style={{
+                            backgroundColor: '#1a2a3a',
+                            padding: '30px',
+                            borderRadius: '16px',
+                            width: '60%',
+                            maxWidth: '600px',
+                            maxHeight: '80vh',
+                            overflowY: 'auto',
+                            position: 'relative'
+                        }}
+                    >
+                        <button 
+                            onClick={() => setShowEmployeesModal(false)}
+                            style={{
+                                position: 'absolute',
+                                top: '15px',
+                                right: '15px',
+                                background: 'none',
+                                border: 'none',
+                                color: 'rgba(255,255,255,0.7)',
+                                cursor: 'pointer',
+                                fontSize: '1.2em'
+                            }}
+                        >
+                            <FaTimes />
+                        </button>
+                        <h2 style={{ 
+                            marginBottom: '20px',
+                            color: '#ffffff',
+                            textAlign: 'center'
+                        }}>
+                            Employees
+                        </h2>
+                        {isLoading ? (
+                            <div style={{ textAlign: 'center' }}>
+                                <p>Loading employees...</p>
+                            </div>
+                        ) : employees.length > 0 ? (
+                            <ul style={{ listStyle: 'none', padding: 0 }}>
+                                {employees.map((emp, index) => (
+                                    <li key={index} style={{ 
+                                        padding: '15px', 
+                                        borderBottom: '1px solid rgba(255,255,255,0.1)',
+                                        display: 'flex',
+                                        justifyContent: 'space-between'
+                                    }}>
+                                        <span>{emp.Username}</span>
+                                        <span style={{ color: '#4facfe' }}>{emp.UserRole}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p style={{ textAlign: 'center' }}>No employees found for this company.</p>
+                        )}
+                    </motion.div>
+                </div>
+            )}
 
             {/* Footer */}
             <div style={{
