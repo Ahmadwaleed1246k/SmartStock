@@ -18,6 +18,9 @@ const SaleForm = () => {
   const [sales, setSales] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [stockQuantities, setStockQuantities] = useState({});
+  const [isWalkIn, setIsWalkIn] = useState(false);
+  const [paymentAccounts, setPaymentAccounts] = useState([]);
+  const [selectedPaymentAccount, setSelectedPaymentAccount] = useState(null);   
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -52,6 +55,29 @@ const SaleForm = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ compID })
         });
+
+        const walkInRes = await fetch('http://localhost:5000/api/account/ensure-walkIn', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ compID })
+        });
+
+        const walkInData = await walkInRes.json();
+        setCustomers(customersData.concat(walkInData));
+        
+        await fetch('http://localhost:5000/api/account/ensure-cash-bank', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ compID })
+        });
+
+        const cashBankRes = await fetch('http://localhost:5000/api/account/get-cash-bank', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ compID })
+        });
+        const cashBankData = await cashBankRes.json();
+        setPaymentAccounts(cashBankData);
 
         // Fetch products
         const productsRes = await fetch('http://localhost:5000/api/product/get-products-by-company', {
@@ -200,7 +226,9 @@ const SaleForm = () => {
           discount: sale.Discount,
           PrdID: sale.PrdID,
           Quantity: sale.Quantity,
-          voucherDate: voucherDate
+          voucherDate: voucherDate,
+          isWalkIn: isWalkIn,
+          paymentAccountId: selectedPaymentAccount?.value
         }));
 
         const response = await fetch('http://localhost:5000/api/sale/add-sale', {
@@ -217,6 +245,31 @@ const SaleForm = () => {
       } catch (error) {
         console.error('Sale submission error:', error);
       }
+    }
+  };
+
+  const handleCustomerChange = async (selectedOption) => {
+    const customerId = selectedOption.value;
+    const customer = customers.find(c => c.AcctID === customerId);
+    setIsWalkIn(customer?.AcctType === 'WalkIn');
+    setSelectedCustomer(customerId);
+    const compID = sessionStorage.getItem('CompID');
+    if (customer?.AcctType === 'WalkIn') {
+      // Ensure cash/bank accounts exist
+      await fetch('http://localhost:5000/api/account/ensure-cash-bank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ compID })
+      });
+      
+      // Fetch cash/bank accounts
+      const accountsRes = await fetch('http://localhost:5000/api/account/get-cash-bank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ compID })
+      });
+      const accountsData = await accountsRes.json();
+      setPaymentAccounts(accountsData);
     }
   };
 
@@ -367,7 +420,7 @@ const SaleForm = () => {
             </label>
             <Select
               options={customerOptions}
-              onChange={(selected) => setSelectedCustomer(selected.value)}
+              onChange={handleCustomerChange}
               value={customerOptions.find(option => option.value === selectedCustomer)}
               isDisabled={sales.length > 0}
               placeholder="Select Customer"
@@ -401,7 +454,26 @@ const SaleForm = () => {
               }}
             />
           </div>
-
+          {isWalkIn && (
+          <div>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '8px',
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontSize: '0.9em'
+            }}>Payment Method</label>
+            <Select
+              options={paymentAccounts.map(acc => ({
+                value: acc.AcctID,
+                label: acc.AcctName
+              }))}
+              onChange={setSelectedPaymentAccount}
+              placeholder="Select Payment Method"
+              styles={customSelectStyles}
+              isDisabled={sales.length > 0}
+            />
+          </div>
+        )}
           <div>
             <label style={{ 
               display: 'block', 
