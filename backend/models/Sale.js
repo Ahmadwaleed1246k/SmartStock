@@ -2,7 +2,6 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const Account = require('./Account');
 const Company = require('./Company');
-const PaymentMethod = require('./PaymentMethod');
 
 const Sale = sequelize.define('Sale', {
     SaleID: {
@@ -35,17 +34,14 @@ const Sale = sequelize.define('Sale', {
             key: 'AcctID'
         }
     },
-    PaymentMethodID: {
+    VoucherNo: {
         type: DataTypes.INTEGER,
-        references: {
-            model: PaymentMethod,
-            key: 'PaymentID'
-        }
+        allowNull: false,
+        unique: true
     }
 });
 
 Sale.belongsTo(Company, { foreignKey: 'CompID', onDelete: 'CASCADE' });
 Sale.belongsTo(Account, { foreignKey: 'CustomerID' });
-Sale.belongsTo(PaymentMethod, { foreignKey: 'PaymentMethodID' });
 
 module.exports = Sale;
