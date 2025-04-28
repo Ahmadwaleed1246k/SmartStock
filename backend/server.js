@@ -1,64 +1,59 @@
 const express = require('express');
 const cors = require('cors');
-const session = require('express-session');
+const session = require('express-session'); // Add this
 const { syncModels } = require('./model');
 const companyRoutes = require('./Routes/CompanyRoutes');
 const userRoutes = require('./Routes/userRoutes');
 const accountRoutes = require('./Routes/accountRoutes');
-
+const productCatRoutes = require('./Routes/productCatRoutes');
+const productRoutes = require('./Routes/productRoutes');
+const purchaseRoutes = require('./Routes/purchaseRoutes');
+const saleRoutes = require('./Routes/saleRoutes');
+const productGroupRoutes = require('./Routes/productGroupRoutes');
+const supplierProductRoutes = require('./Routes/SupplierProductsRoutes');
+const paymentRoutes = require('./Routes/paymentRoutes');
 const app = express();
 const PORT = 5000;
 
-// Enhanced CORS configuration
+// Middleware
 app.use(cors({
   origin: 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
-// Parse JSON bodies
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Session configuration
 app.use(
   session({
-    secret: 'key@123',
+    secret: 'key@123', // Replace with a secure key
     resave: false,
-    saveUninitialized: false,
-    cookie: { 
-      secure: false, // Set to true if using HTTPS
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'lax'
-    }
+    saveUninitialized: true,
+    cookie: { secure: false } // set true for HTTPS
   })
 );
 
-// Database connection
-const { sequelize } = require('./model');
-sequelize.authenticate()
-  .then(() => console.log('✅ Database connected successfully'))
-  .catch(err => console.error('❌ Database connection error:', err));
-
 // Routes
 app.use('/api/company', companyRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/accounts', accountRoutes);
+app.use('/api/Users', userRoutes);
+app.use('/api/account', accountRoutes);
+app.use('/api/payment', paymentRoutes);
+app.use('/api/product-category', productCatRoutes);
+app.use('/api/product', productRoutes);
+app.use('/api/purchase', purchaseRoutes);
+app.use('/api/sale', saleRoutes);
+app.use('/api/product-group', productGroupRoutes);
+app.use('/api/supplier-product', supplierProductRoutes);
+app.use('/api/payment', paymentRoutes);
+// Sync Models
+syncModels();
 
-// Error handling
-app.use((err, req, res, next) => {
-  console.error('❌ Server error:', err.stack);
-  res.status(500).json({ 
-    error: 'Internal server error',
-    message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
+// Test Route
+app.get('/', (req, res) => {
+  res.send('Hello from Node.js Backend!');
 });
 
-// Start server
+// Start Server
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-  syncModels();
+  console.log(`✅ Server is running on http://localhost:${PORT}`);
 });
