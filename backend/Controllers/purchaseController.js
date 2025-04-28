@@ -22,10 +22,10 @@ const createPurchase = async (req, res) => {
     // Generate VoucherNo
     const [voucherResult] = await sequelize.query('SELECT MAX(VoucherNo) AS MaxVoucherNo FROM Purchases');
     const nextVoucherNo = (voucherResult[0].MaxVoucherNo || 0) + 1;
-
+    let totalAmount = 0;
     for (const purchase of purchases) {
       const { compid, supplierid, totalamount, PrdID, Quantity, purchasePrice, voucherDate } = purchase;
-
+      totalAmount += totalamount;
       // Create Purchase
       await sequelize.query(
         'EXEC CreatePurchase @VoucherNo = :VoucherNo, @compid = :compid, @supplierid = :supplierid, @totalamount = :totalamount, @PrdID = :PrdID, @Quantity = :Quantity, @PurchaseDate = :voucherDate',
@@ -53,21 +53,23 @@ const createPurchase = async (req, res) => {
         }
       );
 
-      await sequelize.query(
-        'Insert into AccountDetails (VoucherNo, VoucherType, AcctID, Debit, Credit, CompID) VALUES (:VoucherNo, :VoucherType, :AcctID, :Debit, :Credit, :CompID)',
-        {
-          replacements: {
-            VoucherNo: nextVoucherNo,
-            VoucherType: 'Purchase',
-            AcctID: localPurchaseAccount.AcctID,
-            Debit: totalamount,
-            Credit: 0,
-            CompID: compid
-          }
-        }
-      );
-        
+      
     }
+
+    await sequelize.query(
+      'Insert into AccountDetails (VoucherNo, VoucherType, AcctID, Debit, Credit, CompID) VALUES (:VoucherNo, :VoucherType, :AcctID, :totalAmount, 0, :CompID), (:VoucherNo, :VoucherType, :selectedSupplier, 0, :totalAmount, :CompID)',
+      {
+        replacements: {
+          VoucherNo: nextVoucherNo,
+          VoucherType: 'Purchase',
+          AcctID: localPurchaseAccount.AcctID,
+          selectedSupplier: purchases[0].supplierid,
+          totalAmount: totalAmount,
+          CompID: compID
+        }
+      }
+    );
+      
 
     res.status(201).json({ message: 'Purchase created successfully', VoucherNo: nextVoucherNo });
   } catch (error) {
