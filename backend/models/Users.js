@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const Company = require('./Company');
+const crypto = require('crypto');
 
 const Users = sequelize.define('Users', {
   UserID: {
@@ -17,18 +18,15 @@ const Users = sequelize.define('Users', {
     }
   },
   Password: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.BLOB,
     allowNull: false,
-    validate: {
-      len: [5, 255],
-      isValidPassword(value) {
-        if (!/[!@#$%^&*()_|-]/.test(value)) {
-          throw new Error('Password must contain at least one special character');
-        }
-      }
+    set(value) {
+      // Hash the password before storing
+      const salt = crypto.randomBytes(16).toString('hex');
+      const hash = crypto.pbkdf2Sync(value, salt, 1000, 64, 'sha512').toString('hex');
+      this.setDataValue('Password', Buffer.from(`${salt}:${hash}`));
     }
   },
- 
   UserRole: {
     type: DataTypes.STRING(20),
     validate: {
@@ -45,7 +43,14 @@ const Users = sequelize.define('Users', {
   }
 }, {
   tableName: 'Users',
-  timestamps: false
+  timestamps: false,
+  instanceMethods: {
+    validPassword: function(password) {
+      const [salt, hash] = this.Password.toString().split(':');
+      const verifyHash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+      return hash === verifyHash;
+    }
+  }
 });
 
 Users.belongsTo(Company, { foreignKey: 'CompID', onDelete: 'CASCADE' });
