@@ -12,7 +12,9 @@ import {
     FaBoxes,
     FaTags,
     FaBox,
-    FaCreditCard
+    FaKey,
+    FaCreditCard,
+    FaBell
 } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
@@ -22,7 +24,15 @@ const Dashboard = () => {
     const [employees, setEmployees] = useState([]);
     const [showEmployeesModal, setShowEmployeesModal] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
     const [userRole, setUserRole] = useState('');
+    const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+    const [lowStockProducts, setLowStockProducts] = useState([]);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -72,6 +82,30 @@ const Dashboard = () => {
         fetchCompanyDetails();
     }, [navigate]);
 
+    const fetchLowStockProducts = async () => {
+        try {
+          const compID = sessionStorage.getItem('CompID');
+          const response = await fetch('http://localhost:5000/api/product/complete-stock-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ CompID: compID })
+          });
+      
+          if (!response.ok) throw new Error('Failed to fetch stock data');
+          
+          const data = await response.json();
+          console.log(data);
+          // Filter products where TotalStock <= RestockLevel
+          const lowStock = data.filter(product => 
+            product.TotalStock <= (product.RestockLevel || 0)
+          );
+          setLowStockProducts(lowStock);
+        } catch (error) {
+          console.error('Error fetching low stock products:', error);
+          setError('Failed to load notifications');
+        }
+      };
+
     const handleLogout = () => {
         sessionStorage.removeItem('CompID');
         sessionStorage.removeItem('UserID');
@@ -79,6 +113,56 @@ const Dashboard = () => {
         navigate('/');
     };
 
+    const handlePasswordChange = async () => {
+        setError('');
+        setSuccess('');
+        
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            setError('All fields are required');
+            return;
+        }
+
+        if (newPassword.length < 5) {
+            setError('Password must be at least 5 characters');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            setError('New passwords do not match');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const response = await fetch('http://localhost:5000/api/Users/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userID: sessionStorage.getItem('UserID'),
+                    oldPassword: currentPassword,
+                    newPassword: newPassword
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to change password');
+            }
+
+            setSuccess('Password changed successfully!');
+            setTimeout(() => {
+                setShowPasswordModal(false);
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+            }, 1500);
+        } catch (error) {
+            console.error('Error changing password:', error);
+            setError(error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const sectionData = [
         { 
@@ -199,6 +283,73 @@ const Dashboard = () => {
                         Welcome, {userName} ({userRole})
                     </p>
                 </div>
+
+                <div style={{ display: 'flex', gap: '15px' }}>
+                    <motion.button
+                    onClick={() => {
+                        setShowNotificationsModal(true);
+                        fetchLowStockProducts();
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    style={{
+                        padding: '12px 24px',
+                        backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                        color: '#ffc107',
+                        border: '1px solid #ffc107',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        backdropFilter: 'blur(4px)',
+                        transition: 'all 0.3s ease'
+                    }}
+                    >
+                    <FaBell /> Notifications
+                    {lowStockProducts.length > 0 && (
+                        <span style={{
+                        backgroundColor: '#ff5722',
+                        color: 'white',
+                        borderRadius: '50%',
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        fontSize: '0.8em',
+                        marginLeft: '8px'
+                        }}>
+                        {lowStockProducts.length}
+                        </span>
+                    )}
+                    </motion.button>
+
+                {userRole === 'Admin' && (
+                        <motion.button
+                            onClick={() => setShowPasswordModal(true)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            style={{
+                                padding: '12px 24px',
+                                backgroundColor: 'rgba(79, 172, 254, 0.2)',
+                                color: '#4facfe',
+                                border: '1px solid #4facfe',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                backdropFilter: 'blur(4px)',
+                                transition: 'all 0.3s ease'
+                            }}
+                        >
+                            <FaKey /> Change Password
+                        </motion.button>
+                    )}    
+                
                 <motion.button
                     onClick={handleLogout}
                     whileHover={{ scale: 1.05 }}
@@ -220,6 +371,7 @@ const Dashboard = () => {
                 >
                     <FaSignOutAlt /> Logout
                 </motion.button>
+                </div>
             </motion.div>
 
 
@@ -358,6 +510,300 @@ const Dashboard = () => {
                         )}
                     </motion.div>
                 </div>
+            )}
+
+            {/* Password Change Modal */}
+            {showPasswordModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1000
+                }}>
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        style={{
+                            backgroundColor: '#1a2a3a',
+                            padding: '30px',
+                            borderRadius: '16px',
+                            width: '60%',
+                            maxWidth: '500px',
+                            position: 'relative'
+                        }}
+                    >
+                        <button 
+                            onClick={() => {
+                                setShowPasswordModal(false);
+                                setError('');
+                                setSuccess('');
+                                setCurrentPassword('');
+                                setNewPassword('');
+                                setConfirmPassword('');
+                            }}
+                            style={{
+                                position: 'absolute',
+                                top: '15px',
+                                right: '15px',
+                                background: 'none',
+                                border: 'none',
+                                color: 'rgba(255,255,255,0.7)',
+                                cursor: 'pointer',
+                                fontSize: '1.2em'
+                            }}
+                        >
+                            <FaTimes />
+                        </button>
+                        <h2 style={{ 
+                            marginBottom: '25px',
+                            color: '#ffffff',
+                            fontSize: '1.5em',
+                            fontWeight: '600',
+                            textAlign: 'center'
+                        }}>
+                            Change Password
+                        </h2>
+
+                        {error && (
+                            <div style={{
+                                backgroundColor: 'rgba(255, 50, 50, 0.2)',
+                                color: '#ff6b6b',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                marginBottom: '20px',
+                                textAlign: 'center'
+                            }}>
+                                {error}
+                            </div>
+                        )}
+
+                        {success && (
+                            <div style={{
+                                backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                                color: '#4CAF50',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                marginBottom: '20px',
+                                textAlign: 'center'
+                            }}>
+                                {success}
+                            </div>
+                        )}
+
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '8px',
+                                color: 'rgba(255,255,255,0.8)'
+                            }}>
+                                Current Password
+                            </label>
+                            <input
+                                type="password"
+                                value={currentPassword}
+                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                placeholder="Enter current password"
+                                required
+                                style={{
+                                    width: '95%',
+                                    padding: '12px 16px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '8px',
+                                    color: '#ffffff',
+                                    fontSize: '1em'
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '8px',
+                                color: 'rgba(255,255,255,0.8)'
+                            }}>
+                                New Password
+                            </label>
+                            <input
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="Enter new password"
+                                required
+                                style={{
+                                    width: '95%',
+                                    padding: '12px 16px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '8px',
+                                    color: '#ffffff',
+                                    fontSize: '1em'
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '30px' }}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '8px',
+                                color: 'rgba(255,255,255,0.8)'
+                            }}>
+                                Confirm New Password
+                            </label>
+                            <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                placeholder="Confirm new password"
+                                required
+                                style={{
+                                    width: '95%',
+                                    padding: '12px 16px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '8px',
+                                    color: '#ffffff',
+                                    fontSize: '1em'
+                                }}
+                            />
+                        </div>
+
+                        <motion.button
+                            onClick={handlePasswordChange}
+                            disabled={isLoading}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            style={{
+                                width: '100%',
+                                padding: '14px',
+                                background: 'linear-gradient(90deg, #4facfe 0%, #00f2fe 100%)',
+                                color: '#0f2027',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontWeight: '600',
+                                fontSize: '1.1em',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                gap: '8px',
+                                opacity: isLoading ? 0.7 : 1
+                            }}
+                        >
+                            {isLoading ? 'Changing...' : 'Change Password'}
+                        </motion.button>
+                    </motion.div>
+                </div>
+            )}
+
+
+            {/* Notifications Modal */}
+            {showNotificationsModal && (
+            <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1000
+            }}>
+                <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                style={{
+                    backgroundColor: '#1a2a3a',
+                    padding: '30px',
+                    borderRadius: '16px',
+                    width: '60%',
+                    maxWidth: '800px',
+                    maxHeight: '80vh',
+                    overflowY: 'auto',
+                    position: 'relative'
+                }}
+                >
+                <button 
+                    onClick={() => setShowNotificationsModal(false)}
+                    style={{
+                    position: 'absolute',
+                    top: '15px',
+                    right: '15px',
+                    background: 'none',
+                    border: 'none',
+                    color: 'rgba(255,255,255,0.7)',
+                    cursor: 'pointer',
+                    fontSize: '1.2em'
+                    }}
+                >
+                    <FaTimes />
+                </button>
+                <h2 style={{ 
+                    marginBottom: '20px',
+                    color: '#ffffff',
+                    textAlign: 'center'
+                }}>
+                    Low Stock Notifications
+                </h2>
+                
+                {lowStockProducts.length > 0 ? (
+                    <div style={{ overflowX: 'auto' }}>
+                    <table style={{ 
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        color: 'rgba(255,255,255,0.8)'
+                    }}>
+                        <thead>
+                        <tr style={{ 
+                            backgroundColor: 'rgba(79, 172, 254, 0.2)',
+                            borderBottom: '2px solid #4facfe'
+                        }}>
+                            <th style={{ padding: '12px', textAlign: 'left' }}>Product</th>
+                            <th style={{ padding: '12px', textAlign: 'left' }}>Current Stock</th>
+                            <th style={{ padding: '12px', textAlign: 'left' }}>Restock Level</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {lowStockProducts.map((product, index) => (
+                            <tr key={index} style={{ 
+                            borderBottom: '1px solid rgba(255,255,255,0.1)',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255,255,255,0.05)'
+                            }
+                            }}>
+                            <td style={{ padding: '12px' }}>{product.PrdName}</td>
+                            <td style={{ 
+                                padding: '12px',
+                                color: '#ff5252',
+                                fontWeight: 'bold'
+                            }}>
+                                {product.TotalStock}
+                            </td>
+                            <td style={{ padding: '12px' }}>{product.RestockLevel}</td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                    </div>
+                ) : (
+                    <p style={{ 
+                    textAlign: 'center',
+                    color: 'rgba(255,255,255,0.7)',
+                    padding: '20px'
+                    }}>
+                    No products need restocking at this time.
+                    </p>
+                )}
+                </motion.div>
+            </div>
             )}
 
             {/* Footer */}
