@@ -1,16 +1,28 @@
 const { Users, sequelize } = require('../model');
+const crypto = require('crypto');
+
+const hashPassword = (password) => {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+  return Buffer.from(`${salt}:${hash}`);
+};
+
+
+const isValidPassword = (password) => {
+  if (!password || password.length < 5) return false;
+  const specialChars = '!@#$%^&*()_-|';
+  return [...password].some(char => specialChars.includes(char));
+};
 
 const addUser = async (req, res) => {
   try {
-    // Debug logs to see exactly what's coming in
     console.log('Full request body:', req.body);
     console.log('Username value:', req.body.Username);
 
-    // Explicit check for Username
     if (!req.body.Username) {
       return res.status(400).json({ 
         error: 'Username is required',
-        receivedBody: req.body  // This will help debug what was actually received
+        receivedBody: req.body
       });
     }
 
@@ -20,22 +32,28 @@ const addUser = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // Validate username length
     if (Username.length < 3) {
       return res.status(400).json({ message: 'Username must be at least 3 characters' });
     }
 
-    // Validate password first
     if (!isValidPassword(Password)) {
       return res.status(400).json({ 
         error: 'Password must be at least 5 characters long and contain at least one special character (!@#$%^&*()_-|)'
       });
     }
 
+    // Hash the password before storing
+    const hashedPassword = hashPassword(Password);
+
     const [newUser] = await sequelize.query(
       'INSERT INTO Users (Username, Password, UserRole, CompID) VALUES (:Username, :Password, :UserRole, :CompID)',
       {
-        replacements: { Username, Password, UserRole, CompID },
+        replacements: { 
+          Username, 
+          Password: hashedPassword, 
+          UserRole, 
+          CompID 
+        },
         type: sequelize.QueryTypes.INSERT
       }
     );
@@ -50,12 +68,7 @@ const addUser = async (req, res) => {
   }
 };
 
-function isValidPassword(password) {
-  if (!password || password.length < 5) return false;
-  
-  const specialChars = '!@#$%^&*()_-|';
-  return [...password].some(char => specialChars.includes(char));
-}
+
 
 const getUsersByCompID = async (req, res) => {
   const { compID } = req.body;
@@ -96,14 +109,22 @@ const loginUser = async (req, res) => {
 
   try {
     const [user] = await sequelize.query(
-      'SELECT * FROM Users WHERE Username = :userName AND Password = :password',
+      'SELECT * FROM Users WHERE Username = :userName',
       {
-        replacements: { userName, password },
+        replacements: { userName },
         type: sequelize.QueryTypes.SELECT
       }
     );
 
     if (!user) {
+      return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    // Verify the password
+    const [salt, hash] = user.Password.toString().split(':');
+    const verifyHash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+
+    if (hash !== verifyHash) {
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
@@ -149,30 +170,45 @@ const changePassword = async (req, res) => {
       });
     }
 
-    const [result] = await sequelize.query(
-      `EXEC ChangePassword @userid = :userID, @oldpassword = :oldPassword, @newpassword = :newPassword`,
+    // Get the user first to verify old password
+    const [user] = await sequelize.query(
+      'SELECT * FROM Users WHERE UserID = :userID',
       {
-        replacements: { userID, oldPassword, newPassword },
-        type: sequelize.QueryTypes.RAW
+        replacements: { userID },
+        type: sequelize.QueryTypes.SELECT
       }
     );
 
-    const outputMessage = result && result.length > 0 ? result[0] : '';
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
-    // You can check logs to debug what SQL Server returns
-    console.log('Password change result:', outputMessage);
+    // Verify old password
+    const [salt, hash] = user.Password.toString().split(':');
+    const verifyHash = crypto.pbkdf2Sync(oldPassword, salt, 1000, 64, 'sha512').toString('hex');
 
-    // Since PRINT in SQL Server doesn't return data, assume success if no error thrown
-    res.status(200).json({ message: 'Password changed successfully' });
-
-  } catch (error) {
-    const errMsg = error.message || error.original?.message || 'Something went wrong';
-    console.error('❌ Error changing password:', errMsg);
-
-    if (errMsg.includes('Incorrect old password')) {
+    if (hash !== verifyHash) {
       return res.status(401).json({ message: 'Incorrect old password' });
     }
 
+    // Hash and update the new password
+    const newHashedPassword = hashPassword(newPassword);
+
+    await sequelize.query(
+      'UPDATE Users SET Password = :password WHERE UserID = :userID',
+      {
+        replacements: { 
+          password: newHashedPassword,
+          userID 
+        },
+        type: sequelize.QueryTypes.UPDATE
+      }
+    );
+
+    res.status(200).json({ message: 'Password changed successfully' });
+  } catch (error) {
+    const errMsg = error.message || error.original?.message || 'Something went wrong';
+    console.error('❌ Error changing password:', errMsg);
     res.status(500).json({ message: 'Internal server error', error: errMsg });
   }
 };
@@ -267,17 +303,14 @@ const addEmployee = async (req, res) => {
   try {
     const { Username, Password, CompID } = req.body;
 
-    // Validate required fields
     if (!Username || !Password || !CompID) {
       return res.status(400).json({ message: 'Username, Password, and CompID are required' });
     }
 
-    // Validate username length
     if (Username.length < 3) {
       return res.status(400).json({ message: 'Username must be at least 3 characters' });
     }
 
-    // Validate password
     if (!isValidPassword(Password)) {
       return res.status(400).json({ 
         error: 'Password must be at least 5 characters long and contain at least one special character (!@#$%^&*()_-|)'
@@ -297,14 +330,17 @@ const addEmployee = async (req, res) => {
       return res.status(404).json({ message: 'Company not found' });
     }
 
-    // Insert the employee (UserRole is hardcoded to 'Employee')
+    // Hash the password before storing
+    const hashedPassword = hashPassword(Password);
+
+    // Insert the employee
     const [newEmployee] = await sequelize.query(
       'INSERT INTO Users (Username, Password, UserRole, CompID) VALUES (:Username, :Password, :UserRole, :CompID)',
       {
         replacements: { 
           Username, 
-          Password, 
-          UserRole: 'Employee', // Hardcoded to ensure only employee role
+          Password: hashedPassword,
+          UserRole: 'Employee',
           CompID 
         },
         type: sequelize.QueryTypes.INSERT
@@ -318,7 +354,6 @@ const addEmployee = async (req, res) => {
   } catch (error) {
     console.error('❌ Error adding employee:', error);
     
-    // Handle duplicate username error
     if (error.name === 'SequelizeUniqueConstraintError') {
       return res.status(400).json({ message: 'Username already exists' });
     }
@@ -368,5 +403,7 @@ module.exports = {
   deleteUser,
   getEmployeesByCompany,
   addEmployee,
-  editEmployee
+  editEmployee,
+  hashPassword,
+  isValidPassword
 };
