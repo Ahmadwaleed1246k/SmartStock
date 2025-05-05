@@ -4,7 +4,7 @@ const {addCustomer, addSupplier, editAccountInfo, getCustomersByCompany,
      getSuppliersByCompID, ensureLocalPurchaseAccount
     , ensureLocalSaleAccount, getPaymentAccounts, getOutstandingBalance
 , deleteSupplier, addCustomer2, deleteCustomer, getSuppliersByCompany2
-, ensureCashBankAccounts, getCashBankAccounts, ensureWalkInCustomer} = require('../Controllers/accountController')
+, ensureCashBankAccounts, getCashBankAccounts, ensureWalkInCustomer, getAccountLedger, getAllAccounts} = require('../Controllers/accountController')
 
 const router = express.Router();
 
@@ -26,5 +26,6 @@ router.post('/delete-customer', deleteCustomer);
 router.post('/ensure-cash-bank', ensureCashBankAccounts);
 router.post('/get-cash-bank', getCashBankAccounts);
 router.post('/ensure-walkin', ensureWalkInCustomer);
-
+router.post('/get-account-ledger', getAccountLedger);
+router.post('/get-all-accounts', getAllAccounts);
 module.exports = router;
