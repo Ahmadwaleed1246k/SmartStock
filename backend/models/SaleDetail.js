@@ -4,14 +4,10 @@ const Sale = require('./Sale');
 const Product = require('./Product');
 
 const SaleDetail = sequelize.define('SaleDetail', {
-  SaleDetailID: {
-    type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true
-  },
   SaleID: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    primaryKey: true,
     references: {
       model: Sale,
       key: 'SaleID'
@@ -20,6 +16,7 @@ const SaleDetail = sequelize.define('SaleDetail', {
   PrdID: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    primaryKey: true,
     references: {
       model: Product,
       key: 'PrdID'
@@ -38,7 +35,12 @@ const SaleDetail = sequelize.define('SaleDetail', {
   timestamps: false
 });
 
-SaleDetail.belongsTo(Sale, { foreignKey: 'SaleID' });
-SaleDetail.belongsTo(Product, { foreignKey: 'PrdID' });
+SaleDetail.belongsTo(Sale, { 
+  foreignKey: 'SaleID',
+  onDelete: 'CASCADE'
+});
+SaleDetail.belongsTo(Product, { 
+  foreignKey: 'PrdID'
+});
 
 module.exports = SaleDetail;
