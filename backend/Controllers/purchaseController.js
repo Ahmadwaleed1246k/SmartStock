@@ -22,42 +22,120 @@ const createPurchase = async (req, res) => {
     // Generate VoucherNo
     const [voucherResult] = await sequelize.query('SELECT MAX(VoucherNo) AS MaxVoucherNo FROM Purchases');
     const nextVoucherNo = (voucherResult[0].MaxVoucherNo || 0) + 1;
-    let totalAmount = 0;
-    for (const purchase of purchases) {
-      const { compid, supplierid, totalamount, PrdID, Quantity, purchasePrice, voucherDate } = purchase;
-      totalAmount += totalamount;
-      // Create Purchase
+    
+    // Calculate total amount for all products
+    const totalAmount = purchases.reduce((sum, purchase) => sum + purchase.totalamount, 0);
+    
+    // Create single purchase entry and get the inserted ID
+    const [purchaseResult] = await sequelize.query(
+      `INSERT INTO Purchases (VoucherNo, CompID, SupplierID, TotalAmount, PurchaseDate) 
+       OUTPUT INSERTED.PurchaseID
+       VALUES (:VoucherNo, :compid, :supplierid, :totalAmount, :voucherDate)`,
+      {
+        replacements: {
+          VoucherNo: nextVoucherNo,
+          compid: purchases[0].compid,
+          supplierid: purchases[0].supplierid,
+          totalAmount: totalAmount,
+          voucherDate: purchases[0].voucherDate
+        }
+      }
+    );
+
+    const purchaseID = purchaseResult[0].PurchaseID;
+
+    // Aggregate quantities for same products
+    const aggregatedPurchases = purchases.reduce((acc, curr) => {
+      const existingProduct = acc.find(p => p.PrdID === curr.PrdID);
+      if (existingProduct) {
+        existingProduct.Quantity += curr.Quantity;
+        existingProduct.totalamount += curr.totalamount;
+      } else {
+        acc.push({ ...curr });
+      }
+      return acc;
+    }, []);
+
+    // Insert purchase details and inventory entries for each unique product
+    for (const purchase of aggregatedPurchases) {
+      const { PrdID, Quantity, purchasePrice, totalamount, compid, supplierid } = purchase;
+      
+      // Insert purchase details with the correct PurchaseID
       await sequelize.query(
-        'EXEC CreatePurchase @VoucherNo = :VoucherNo, @compid = :compid, @supplierid = :supplierid, @totalamount = :totalamount, @PrdID = :PrdID, @Quantity = :Quantity, @PurchaseDate = :voucherDate',
-        { replacements: { VoucherNo: nextVoucherNo, compid, supplierid, totalamount, PrdID, Quantity, voucherDate } }
+        'INSERT INTO PurchaseDetails (PurchaseID, PrdID, Quantity, PurchasePrice) VALUES (:PurchaseID, :PrdID, :Quantity, :PurchasePrice)',
+        {
+          replacements: {
+            PurchaseID: purchaseID,
+            PrdID,
+            Quantity,
+            PurchasePrice: purchasePrice
+          }
+        }
       );
 
+      // Check if stock exists for this product
+      const [stockResult] = await sequelize.query(
+        'SELECT StockQuantity FROM Stock WHERE CompID = :CompID AND PrdID = :PrdID',
+        {
+          replacements: {
+            CompID: compid,
+            PrdID: PrdID
+          }
+        }
+      );
+
+      if (stockResult.length > 0) {
+        // Update existing stock
+        await sequelize.query(
+          'UPDATE Stock SET StockQuantity = StockQuantity + :Quantity, LastUpdated = GETDATE() WHERE CompID = :CompID AND PrdID = :PrdID',
+          {
+            replacements: {
+              CompID: compid,
+              PrdID: PrdID,
+              Quantity: Quantity
+            }
+          }
+        );
+      } else {
+        // Insert new stock record
+        await sequelize.query(
+          'INSERT INTO Stock (CompID, PrdID, StockQuantity, LastUpdated) VALUES (:CompID, :PrdID, :Quantity, GETDATE())',
+          {
+            replacements: {
+              CompID: compid,
+              PrdID: PrdID,
+              Quantity: Quantity
+            }
+          }
+        );
+      }
+
+      // Insert inventory entry
       await sequelize.query(
         `INSERT INTO Inventory
-          (VoucherNo, VoucherType, PrdID, QtyIn, QtyOut, AcctID, UnitRate, Discount, TotalAmount, CompID, EntryDate) 
+          (VoucherNo, VoucherType, PrdID, QtyIn, QtyOut, UnitRate, Discount, TotalAmount, EntryDate, CompID, PurchaseID, SaleID) 
          VALUES   
-          (:VoucherNo, :VoucherType, :PrdID, :QtyIn, 0, :SupplierID, :UnitRate, 0, :TotalAmount, :CompID, :EntryDate)`,
+          (:VoucherNo, :VoucherType, :PrdID, :QtyIn, :QtyOut, :UnitRate, :Discount, :TotalAmount, GETDATE(), :CompID, :PurchaseID, NULL)`,
         {
           replacements: {
             VoucherNo: nextVoucherNo,
             VoucherType: 'Purchase',
             PrdID: PrdID,
             QtyIn: Quantity,
-            SupplierID: supplierid,
+            QtyOut: 0,
             UnitRate: purchasePrice,
+            Discount: 0,
             TotalAmount: totalamount,
-            CompID: compid,
-            EntryDate: new Date().toISOString().slice(0, 19).replace('T', ' ')
-
+            PurchaseID: purchaseID,
+            CompID: compID
           }
         }
       );
-
-      
     }
 
+    // Insert account details
     await sequelize.query(
-      'Insert into AccountDetails (VoucherNo, VoucherType, AcctID, Debit, Credit, CompID) VALUES (:VoucherNo, :VoucherType, :AcctID, :totalAmount, 0, :CompID), (:VoucherNo, :VoucherType, :selectedSupplier, 0, :totalAmount, :CompID)',
+      'Insert into AccountDetails (VoucherNo, VoucherType, AcctID, Debit, Credit, CompID, PurchaseID, SaleID) VALUES (:VoucherNo, :VoucherType, :AcctID, :totalAmount, 0, :CompID, :PurchaseID, NULL), (:VoucherNo, :VoucherType, :selectedSupplier, 0, :totalAmount, :CompID, :PurchaseID, NULL)',
       {
         replacements: {
           VoucherNo: nextVoucherNo,
@@ -65,13 +143,17 @@ const createPurchase = async (req, res) => {
           AcctID: localPurchaseAccount.AcctID,
           selectedSupplier: purchases[0].supplierid,
           totalAmount: totalAmount,
-          CompID: compID
+          CompID: compID,
+          PurchaseID: purchaseID
         }
       }
     );
-      
 
-    res.status(201).json({ message: 'Purchase created successfully', VoucherNo: nextVoucherNo });
+    res.status(201).json({ 
+      message: 'Purchase created successfully', 
+      VoucherNo: nextVoucherNo,
+      PurchaseID: purchaseID 
+    });
   } catch (error) {
     console.error('Error creating purchase:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
