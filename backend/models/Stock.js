@@ -4,23 +4,31 @@ const Products = require('./Product');
 const Company = require('./Company');
 
 const Stock = sequelize.define('Stock', {
-  StockID: {
+  CompID: {
     type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true
+    allowNull: false,
+    primaryKey: true,
+    references: {
+      model: Company,
+      key: 'CompID'
+    }
+  },
+  PrdID: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    primaryKey: true,
+    references: {
+      model: Products,
+      key: 'PrdID'
+    }
   },
   StockQuantity: {
     type: DataTypes.INTEGER,
     allowNull: false
   },
-  PrdID: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    unique: true
-  },
-  CompID: {
-    type: DataTypes.INTEGER,
-    allowNull: false
+  LastUpdated: {
+    type: DataTypes.DATE,
+    defaultValue: sequelize.literal('GETDATE()')
   }
 }, {
   tableName: 'Stock',
