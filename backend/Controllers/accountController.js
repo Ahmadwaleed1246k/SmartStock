@@ -363,6 +363,23 @@ const addCustomer = async (req, res) => {
 
   // Add these methods to your existing accountController.js
 
+const getAllAccounts = async(req, res) => {
+  try{
+     const { compID } = req.body;
+    
+    const [accounts] = await sequelize.query(
+      `SELECT AcctID, AcctName, AcctType FROM Accounts 
+       WHERE CompID = :compID`,
+      { replacements: { compID } }
+    );
+
+    res.status(200).json(accounts);
+  } catch (error) {
+    console.error('Error fetching payment accounts:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+}
+
 const getPaymentAccounts = async (req, res) => {
   try {
     const { compID } = req.body;
@@ -380,6 +397,78 @@ const getPaymentAccounts = async (req, res) => {
   }
 };
 
+const getAccountLedger = async (req, res) => {
+  try {
+    const { AcctID, CompID, StartDate, EndDate } = req.body;
+
+    if (!AcctID || !CompID || !StartDate || !EndDate) {
+      return res.status(400).json({ 
+        message: 'AcctID, CompID, StartDate and EndDate are required' 
+      });
+    }
+    console.log('Received request with body:', req.body);
+    // Get opening balance
+    const openingBalance = await sequelize.query(
+      `SELECT ISNULL(SUM(
+        CASE 
+          WHEN VoucherType IN ('Purchase', 'Paid') THEN Debit - Credit
+          WHEN VoucherType IN ('Sale', 'Received') THEN Credit - Debit
+          ELSE 0
+        END), 0) as OpeningBalance
+      FROM AccountDetails 
+      WHERE AcctID = :AcctID 
+        AND CompID = :CompID
+        AND EntryDate < :StartDate`,
+      {
+        replacements: { AcctID, CompID, StartDate },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    // Get transactions for the period
+    const transactions = await sequelize.query(
+      `SELECT 
+        FORMAT(EntryDate, 'dd-MM-yyyy') as Date,
+        VoucherType as Type,
+        VoucherNo,
+        CASE 
+          WHEN VoucherType IN ('Purchase', 'Paid') THEN 'Local Purchase'
+          WHEN VoucherType IN ('Sale', 'Received') THEN 'Local Sale'
+          ELSE ''
+        END as CounterAccount,
+        Debit,
+        Credit,
+        SUM(Debit - Credit) OVER (ORDER BY EntryDate) + :OpeningBalance as Balance
+      FROM AccountDetails
+      WHERE AcctID = :AcctID 
+        AND CompID = :CompID
+        AND EntryDate BETWEEN :StartDate AND :EndDate
+      ORDER BY EntryDate`,
+      {
+        replacements: { 
+          AcctID, 
+          CompID, 
+          StartDate, 
+          EndDate,
+          OpeningBalance: openingBalance[0].OpeningBalance 
+        },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    res.status(200).json({
+      openingBalance: openingBalance[0].OpeningBalance,
+      transactions: transactions
+    });
+
+  } catch (error) {
+    console.error('Error generating account ledger:', error);
+    res.status(500).json({ 
+      message: 'Internal server error', 
+      error: error.message 
+    });
+  }
+};
 const getOutstandingBalance = async (req, res) => {
   try {
     const { AcctID, compID } = req.body;
@@ -742,5 +831,7 @@ const ensureWalkInCustomer = async (req, res) => {
     getSuppliersByCompany2,
     ensureCashBankAccounts,
     getCashBankAccounts,
-    ensureWalkInCustomer
+    ensureWalkInCustomer,
+    getAccountLedger,
+    getAllAccounts
   };
