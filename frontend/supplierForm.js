@@ -35,7 +35,7 @@ const AccountForm = ({onsubmit}) => {
         console.log('📤 Sending Payload:', formData);
 
         try {
-            const response = await fetch('http://localhost:5000/api/Account/add-account', {
+            const response = await fetch('http://localhost:5000/api/account/add-account', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
@@ -178,6 +178,5 @@ const AccountForm = ({onsubmit}) => {
 };
 
 export default AccountForm;
-
 
 

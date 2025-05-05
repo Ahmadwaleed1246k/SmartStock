@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaPlus, FaTrash, FaEdit, FaSearch } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaEdit, FaSearch, FaArrowLeft } from 'react-icons/fa';
 import { FaTimes } from 'react-icons/fa';
 
 const ProductForm = () => {
@@ -491,7 +491,29 @@ const ProductForm = () => {
         bottom: 0,
         background: 'radial-gradient(circle at 20% 50%, rgba(33, 150, 243, 0.1) 0%, transparent 50%)',
         zIndex: 0
-      }}></div>
+      }}>
+        <motion.button
+                  onClick={() => navigate('/dashboard')}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                      padding: '10px 20px',
+                      backgroundColor: 'rgba(79, 172, 254, 0.2)',
+                      color: '#4facfe',
+                      border: '1px solid #4facfe',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      marginTop: '20px',
+                      marginLeft: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '20px'
+                  }}
+              >
+                  <FaArrowLeft /> Back to Dashboard
+              </motion.button>
+      </div>
 
       <motion.div
         initial={{ opacity: 0 }}
@@ -507,7 +529,8 @@ const ProductForm = () => {
           backdropFilter: 'blur(8px)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           position: 'relative',
-          zIndex: 1
+          zIndex: 1,
+          marginTop: '30px'
         }}
       >
         <h2 style={{ 

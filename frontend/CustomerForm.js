@@ -56,7 +56,7 @@ const CustomerForm = ({ onSubmit }) => {
         setError('');
 
         try {
-            const response = await fetch('http://localhost:5000/api/accounts/add-customer2', {
+            const response = await fetch('http://localhost:5000/api/account/add-customer2', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -146,7 +146,7 @@ const CustomerForm = ({ onSubmit }) => {
                         onChange={handleChange}
                         required
                         style={{
-                            width: '100%',
+                            width: '95%',
                             padding: '10px',
                             border: '1px solid #ddd',
                             borderRadius: '4px'
@@ -164,7 +164,7 @@ const CustomerForm = ({ onSubmit }) => {
                         value={form.Mob}
                         onChange={handleChange}
                         style={{
-                            width: '100%',
+                            width: '95%',
                             padding: '10px',
                             border: '1px solid #ddd',
                             borderRadius: '4px'
@@ -182,7 +182,7 @@ const CustomerForm = ({ onSubmit }) => {
                         value={form.Email}
                         onChange={handleChange}
                         style={{
-                            width: '100%',
+                            width: '95%',
                             padding: '10px',
                             border: '1px solid #ddd',
                             borderRadius: '4px'
@@ -194,7 +194,7 @@ const CustomerForm = ({ onSubmit }) => {
                     type="submit"
                     disabled={isLoading}
                     style={{
-                        width: '100%',
+                        width: '95%',
                         padding: '12px',
                         backgroundColor: isLoading ? '#ccc' : '#4facfe',
                         color: 'white',

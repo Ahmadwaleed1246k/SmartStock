@@ -77,6 +77,7 @@ const CompanyForm = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(userData)
             });
+            
 
             if (!response.ok) {
                 const errorData = await response.json();
@@ -193,6 +194,7 @@ const CompanyForm = () => {
                                     padding: '14px 16px',
                                     width: '100%',
                                     fontSize: '1em',
+                                    marginLeft: '-15px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
                                     borderRadius: '8px',
@@ -221,6 +223,7 @@ const CompanyForm = () => {
                                     padding: '14px 16px',
                                     width: '100%',
                                     fontSize: '1em',
+                                    marginLeft: '-15px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
                                     borderRadius: '8px',
@@ -253,6 +256,7 @@ const CompanyForm = () => {
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
                                     borderRadius: '8px',
+                                    marginLeft: '-15px',
                                     color: '#ffffff',
                                     transition: 'all 0.3s ease',
                                     outline: 'none'
@@ -282,6 +286,7 @@ const CompanyForm = () => {
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
                                     borderRadius: '8px',
+                                    marginLeft: '-15px',
                                     color: '#ffffff',
                                     transition: 'all 0.3s ease',
                                     outline: 'none'
@@ -343,7 +348,8 @@ const CompanyForm = () => {
                                     borderRadius: '8px',
                                     color: '#ffffff',
                                     transition: 'all 0.3s ease',
-                                    outline: 'none'
+                                    outline: 'none',
+                                    marginLeft: '-15px',
                                 }}
                                 onFocus={(e) => {
                                     e.target.style.borderColor = '#4facfe';
@@ -371,6 +377,7 @@ const CompanyForm = () => {
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
                                     borderRadius: '8px',
+                                    marginLeft: '-15px',
                                     color: '#ffffff',
                                     transition: 'all 0.3s ease',
                                     outline: 'none'

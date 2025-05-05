@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaPlus, FaSave, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaArrowLeft, FaTrash } from 'react-icons/fa';
 
 const ProductGroupForm = () => {
   const [groupName, setGroupName] = useState('');
@@ -134,7 +134,28 @@ const ProductGroupForm = () => {
         bottom: 0,
         background: 'radial-gradient(circle at 20% 50%, rgba(33, 150, 243, 0.1) 0%, transparent 50%)',
         zIndex: 0
-      }}></div>
+      }}>
+        <motion.button
+                  onClick={() => navigate('/dashboard')}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                      padding: '10px 20px',
+                      backgroundColor: 'rgba(79, 172, 254, 0.2)',
+                      color: '#4facfe',
+                      border: '1px solid #4facfe',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      marginTop: '20px',
+                      marginLeft: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                  }}
+              >
+                  <FaArrowLeft /> Back to Dashboard
+              </motion.button>
+      </div>
 
       <motion.div
         initial={{ opacity: 0 }}
