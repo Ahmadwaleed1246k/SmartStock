@@ -38,7 +38,7 @@ const addUser = async (req, res) => {
 
     if (!isValidPassword(Password)) {
       return res.status(400).json({ 
-        error: 'Password must be at least 5 characters long and contain at least one special character (!@#$%^&*()_-|)'
+        message: 'Password must be at least 5 characters long and contain at least one special character (!@#$%^&*()_-|)'
       });
     }
 
@@ -313,7 +313,7 @@ const addEmployee = async (req, res) => {
 
     if (!isValidPassword(Password)) {
       return res.status(400).json({ 
-        error: 'Password must be at least 5 characters long and contain at least one special character (!@#$%^&*()_-|)'
+        message: 'Password must be at least 5 characters long and contain at least one special character (!@#$%^&*()_-|)'
       });
     }
 
