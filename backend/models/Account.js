@@ -36,9 +36,9 @@ const Accounts = sequelize.define('Accounts', {
   },
   AcctType: {
     type: DataTypes.STRING(20),
-    validate: {
-      isIn: [['Supplier', 'Customer']]
-    }
+    // validate: {
+    //   isIn: [['Supplier', 'Customer']]
+    // }
   },
   CompID: {
     type: DataTypes.INTEGER,
