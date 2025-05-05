@@ -33,7 +33,7 @@ const SuppliersPage = () => {
     const fetchSuppliers = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('http://localhost:5000/api/accounts/get-suppliers-by-company', {
+            const response = await fetch('http://localhost:5000/api/account/get-suppliers-by-company2', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ compID }),
@@ -65,7 +65,7 @@ const SuppliersPage = () => {
 
         setIsLoading(true);
         try {
-            const response = await fetch('http://localhost:5000/api/accounts/add-suppliers', {
+            const response = await fetch('http://localhost:5000/api/account/add-suppliers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -107,10 +107,10 @@ const SuppliersPage = () => {
 
     const handleDeleteSupplier = async (supplierId) => {
         if (!window.confirm('Are you sure you want to delete this supplier?')) return;
-
+        if (!window.confirm('This will delete all the data associated with this supplier. Do you confirm?')) return;
         setIsLoading(true);
         try {
-            const response = await fetch('http://localhost:5000/api/accounts/delete-supplier', {
+            const response = await fetch('http://localhost:5000/api/account/delete-supplier', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ AcctID: supplierId }),
@@ -145,7 +145,7 @@ const SuppliersPage = () => {
         setIsLoading(true);
         try {
             // First update the account name
-            await fetch('http://localhost:5000/api/accounts/edit-account-info', {
+            await fetch('http://localhost:5000/api/account/edit-account-info', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -159,7 +159,7 @@ const SuppliersPage = () => {
             // Then update other fields if they exist
             const updates = [];
             if (currentSupplier.Address !== undefined) {
-                updates.push(fetch('http://localhost:5000/api/accounts/edit-account-info', {
+                updates.push(fetch('http://localhost:5000/api/account/edit-account-info', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -172,7 +172,7 @@ const SuppliersPage = () => {
             }
     
             if (currentSupplier.Tel !== undefined) {
-                updates.push(fetch('http://localhost:5000/api/accounts/edit-account-info', {
+                updates.push(fetch('http://localhost:5000/api/account/edit-account-info', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -185,7 +185,7 @@ const SuppliersPage = () => {
             }
     
             if (currentSupplier.Mob !== undefined) {
-                updates.push(fetch('http://localhost:5000/api/accounts/edit-account-info', {
+                updates.push(fetch('http://localhost:5000/api/account/edit-account-info', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -198,7 +198,7 @@ const SuppliersPage = () => {
             }
     
             if (currentSupplier.Email !== undefined) {
-                updates.push(fetch('http://localhost:5000/api/accounts/edit-account-info', {
+                updates.push(fetch('http://localhost:5000/api/account/edit-account-info', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -524,7 +524,8 @@ const SuppliersPage = () => {
                             <label style={{
                                 display: 'block',
                                 marginBottom: '8px',
-                                color: 'rgba(255,255,255,0.8)'
+                                color: 'rgba(255,255,255,0.8)',
+                                
                             }}>
                                 Account Name *
                             </label>
@@ -536,7 +537,7 @@ const SuppliersPage = () => {
                                 placeholder="Enter supplier name"
                                 required
                                 style={{
-                                    width: '100%',
+                                    width: '93%',
                                     padding: '12px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -562,7 +563,7 @@ const SuppliersPage = () => {
                                 onChange={handleInputChange}
                                 placeholder="Enter address"
                                 style={{
-                                    width: '100%',
+                                    width: '93%',
                                     padding: '12px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -588,7 +589,7 @@ const SuppliersPage = () => {
                                 onChange={handleInputChange}
                                 placeholder="Enter telephone"
                                 style={{
-                                    width: '100%',
+                                    width: '93%',
                                     padding: '12px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -614,7 +615,7 @@ const SuppliersPage = () => {
                                 onChange={handleInputChange}
                                 placeholder="Enter mobile"
                                 style={{
-                                    width: '100%',
+                                    width: '93%',
                                     padding: '12px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -640,7 +641,7 @@ const SuppliersPage = () => {
                                 onChange={handleInputChange}
                                 placeholder="Enter email"
                                 style={{
-                                    width: '100%',
+                                    width: '93%',
                                     padding: '12px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -775,7 +776,7 @@ const SuppliersPage = () => {
                                 onChange={handleInputChange}
                                 required
                                 style={{
-                                    width: '100%',
+                                    width: '95%',
                                     padding: '12px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -800,7 +801,7 @@ const SuppliersPage = () => {
                                 value={currentSupplier.Address || ''}
                                 onChange={handleInputChange}
                                 style={{
-                                    width: '100%',
+                                    width: '95%',
                                     padding: '12px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -825,7 +826,7 @@ const SuppliersPage = () => {
                                 value={currentSupplier.Tel || ''}
                                 onChange={handleInputChange}
                                 style={{
-                                    width: '100%',
+                                    width: '95%',
                                     padding: '12px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -850,7 +851,7 @@ const SuppliersPage = () => {
                                 value={currentSupplier.Mob || ''}
                                 onChange={handleInputChange}
                                 style={{
-                                    width: '100%',
+                                    width: '95%',
                                     padding: '12px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -875,7 +876,7 @@ const SuppliersPage = () => {
                                 value={currentSupplier.Email || ''}
                                 onChange={handleInputChange}
                                 style={{
-                                    width: '100%',
+                                    width: '95%',
                                     padding: '12px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.2)',
