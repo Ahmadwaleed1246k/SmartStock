@@ -235,26 +235,78 @@ const getStockByProduct = async (req, res) => {
 
 const getProductLedger = async (req, res) => {
   try {
-    const { PrdID, StartDate, EndDate } = req.body;
+    const { PrdID, StartDate, EndDate, CompID } = req.body;
 
-    if (!PrdID || !StartDate || !EndDate) {
+    if (!PrdID || !StartDate || !EndDate || !CompID) {
       return res.status(400).json({ message: 'PrdID, StartDate, and EndDate are required' });
     }
 
-    // Validate date format (optional, depending on your use case)
+    // Validate date format
     if (isNaN(Date.parse(StartDate)) || isNaN(Date.parse(EndDate))) {
       return res.status(400).json({ message: 'Invalid date format' });
     }
 
-    const ledgerData = await sequelize.query(
-      'EXEC GetProductLedger @prdid = :PrdID, @startdate = :StartDate, @enddate = :EndDate',
+    // Get opening stock
+    const [openingStockResult] = await sequelize.query(
+      `SELECT ISNULL(
+        (SELECT SUM(CASE 
+          WHEN VoucherType = 'Purchase' THEN QtyIn
+          WHEN VoucherType = 'Sale' THEN -QtyOut
+          ELSE 0
+        END)
+        FROM Inventory
+        WHERE PrdID = :PrdID 
+        AND CompID = :CompID
+        AND EntryDate < :StartDate), 0) as OpeningStock`,
       {
-        replacements: { PrdID, StartDate, EndDate },
+        replacements: { PrdID, CompID, StartDate },
         type: sequelize.QueryTypes.SELECT
       }
     );
 
-    res.status(200).json(ledgerData);
+    // Get transactions for the period
+    const ledgerData = await sequelize.query(
+      `SELECT 
+        i.VoucherNo,
+        i.VoucherType,
+        FORMAT(i.EntryDate, 'dd-MM-yyyy') as Date,
+        i.QtyIn,
+        i.QtyOut,
+        i.UnitRate,
+        i.TotalAmount,
+        CASE 
+          WHEN i.VoucherType = 'Purchase' THEN a.AcctName
+          WHEN i.VoucherType = 'Sale' THEN c.AcctName
+        END as Party,
+        (SELECT SUM(CASE 
+          WHEN VoucherType = 'Purchase' THEN QtyIn
+          WHEN VoucherType = 'Sale' THEN -QtyOut
+          ELSE 0
+        END)
+        FROM Inventory
+        WHERE PrdID = :PrdID 
+        AND CompID = :CompID
+        AND EntryDate <= i.EntryDate) as RunningBalance
+      FROM Inventory i
+      LEFT JOIN Purchases p ON i.PurchaseID = p.PurchaseID
+      LEFT JOIN Sales s ON i.SaleID = s.SaleID
+      LEFT JOIN Accounts a ON p.SupplierID = a.AcctID
+      LEFT JOIN Accounts c ON s.CustomerID = c.AcctID
+      WHERE i.PrdID = :PrdID 
+        AND i.CompID = :CompID
+        AND i.EntryDate BETWEEN :StartDate AND :EndDate
+      ORDER BY i.EntryDate`,
+      {
+        replacements: { PrdID, CompID, StartDate, EndDate },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    res.status(200).json({
+      openingStock: openingStockResult.OpeningStock,
+      transactions: ledgerData
+    });
+
   } catch (error) {
     console.error('❌ Error fetching product ledger:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
@@ -361,7 +413,8 @@ const getCompleteStockReport = async (req, res) => {
   
     const cleanedResults = results.map(row => ({
       PrdName: row.PrdName,
-      TotalStock: Number(row.TotalStock) || 0
+      TotalStock: Number(row.TotalStock) || 0,
+      RestockLevel: Number(row.RestockLevel)
     }));
     
   
@@ -495,6 +548,8 @@ const getProductsWithSuppliers = async (req, res) => {
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
+
+
 
 module.exports = {
     addProduct,
