@@ -138,9 +138,73 @@ const getNextVoucherNo = async (req, res) => {
   }
 };
 
+const getPaymentDueNotifications = async (req, res) => {
+  try {
+    const { CompID } = req.body;
+    
+    // Get transactions that are more than 7 days old and not fully paid
+    const results = await sequelize.query(`
+      -- Overdue payments to suppliers (purchases)
+     SELECT 
+    'Purchase' AS Type,
+    a.AcctName AS AccountName,
+    p.PurchaseDate AS TransactionDate,
+    p.TotalAmount,
+    DATEDIFF(day, p.PurchaseDate, GETDATE()) AS DaysOverdue,
+    p.VoucherNo
+FROM Purchases p
+JOIN Accounts a ON p.SupplierID = a.AcctID
+WHERE p.CompID = :CompID
+    AND DATEDIFF(day, p.PurchaseDate, GETDATE()) > 7
+    AND p.TotalAmount > (
+        SELECT ISNULL(SUM(ad.Debit - ad.Credit), 0)
+        FROM AccountDetails ad
+        WHERE ad.AcctID = p.SupplierID
+            AND ad.VoucherType = 'Payment'
+            AND ad.CompID = :CompID
+            AND ad.EntryDate >= p.PurchaseDate
+    )
 
+UNION ALL
 
+-- Overdue Sales
+SELECT 
+    'Sale' AS Type,
+    a.AcctName AS AccountName,
+    s.SaleDate AS TransactionDate,
+    s.TotalAmount,
+    DATEDIFF(day, s.SaleDate, GETDATE()) AS DaysOverdue,
+    s.VoucherNo
+FROM Sales s
+JOIN Accounts a ON s.CustomerID = a.AcctID
+WHERE s.CompID = :CompID
+    AND DATEDIFF(day, s.SaleDate, GETDATE()) > 7
+    AND s.TotalAmount > (
+        SELECT ISNULL(SUM(ad.Credit - ad.Debit), 0)
+        FROM AccountDetails ad
+        WHERE ad.AcctID = s.CustomerID
+            AND ad.VoucherType = 'Payment'
+            AND ad.CompID = :CompID
+            AND ad.EntryDate >= s.SaleDate
+    )
+ORDER BY DaysOverdue DESC;
+
+    `, {
+      replacements: { CompID },
+      type: sequelize.QueryTypes.SELECT
+    });
+    const notifications = Array.isArray(results) ? results : [];
+    res.status(200).json(notifications);
+  } catch (error) {
+    console.error('Error fetching payment due notifications:', error);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
 module.exports = {
   createPayment,
-  getNextVoucherNo
+  getNextVoucherNo,
+  getPaymentDueNotifications
 };
