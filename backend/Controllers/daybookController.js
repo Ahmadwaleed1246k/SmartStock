@@ -1,110 +1,124 @@
-const { Purchases, Sales, Accounts, Products, PurchaseDetails, SaleDetails, sequelize } = require('../model');
-const { Op } = require('sequelize');
+const { sequelize } = require('../model');
 
 const getDaybook = async (req, res) => {
   try {
-    const { CompID, StartDate, EndDate } = req.query;
+    const { compID, startDate, endDate, filterType = 'all' } = req.body;
 
-    // Validate input
-    if (!CompID || !StartDate || !EndDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required parameters'
-      });
+    if (!compID || !startDate || !endDate) {
+      return res.status(400).json({ message: 'compID, startDate, and endDate are required' });
     }
 
-    // Process dates
-    const startDate = new Date(StartDate);
-    const endDate = new Date(EndDate);
-    endDate.setHours(23, 59, 59, 999);
-
-    // Alternative approach using raw query with proper parameter binding
-    const purchasesQuery = `
+    // Base query for account details (payments)
+    let accountDetailsQuery = `
       SELECT 
-        'Purchase' AS TransactionType,
-        p.PurchaseDate AS TransactionDate,
-        p.PurchaseID AS TransactionID,
-        a.AccountName AS Account,
-        pr.ProductName AS ProductName,
-        pd.Quantity,
-        pd.PurchasePrice AS Price,
-        p.TotalAmount
+        CONVERT(VARCHAR, ad.EntryDate, 23) AS date,
+        ad.VoucherType AS type,
+        ad.VoucherNo,
+        a.AcctName AS accountName,
+        ad.Debit,
+        ad.Credit,
+        CASE 
+          WHEN ad.VoucherType = 'Payment' THEN 
+            CASE 
+              WHEN p.PaymentType = 'Paid' THEN 'Payment to ' + a.AcctName
+              WHEN p.PaymentType = 'Received' THEN 'Payment from ' + a.AcctName
+              ELSE p.Reference
+            END
+          ELSE ad.VoucherType + ' entry'
+        END AS description
+      FROM AccountDetails ad
+      LEFT JOIN Accounts a ON ad.AcctID = a.AcctID
+      LEFT JOIN Payments p ON ad.VoucherNo = p.VoucherNo AND ad.CompID = p.CompID
+      WHERE ad.CompID = :compID 
+        AND CAST(ad.EntryDate AS DATE) BETWEEN :startDate AND :endDate
+    `;
+
+    // Add filter for transaction type if needed
+    if (filterType !== 'all') {
+      accountDetailsQuery += ` AND ad.VoucherType = :filterType`;
+    }
+
+    // Purchase transactions
+    let purchaseQuery = `
+      SELECT 
+        CONVERT(VARCHAR, p.PurchaseDate, 23) AS date,
+        'Purchase' AS type,
+        p.VoucherNo,
+        a.AcctName AS accountName,
+        pd.PurchasePrice * pd.Quantity AS Debit,
+        0 AS Credit,
+        'Purchase of ' + prd.PrdName AS description
       FROM Purchases p
-      JOIN Accounts a ON p.SupplierID = a.AccountID
       JOIN PurchaseDetails pd ON p.PurchaseID = pd.PurchaseID
-      JOIN Products pr ON pd.PrdID = pr.PrdID
-      WHERE p.CompID = @compID
-        AND p.PurchaseDate BETWEEN @startDate AND @endDate
+      JOIN Accounts a ON p.SupplierID = a.AcctID
+      JOIN Products prd ON pd.PrdID = prd.PrdID
+      WHERE p.CompID = :compID
+        AND CAST(p.PurchaseDate AS DATE) BETWEEN :startDate AND :endDate
     `;
 
-    const salesQuery = `
+    // Only include purchases if filter allows
+    if (filterType !== 'all' && filterType !== 'purchase') {
+      purchaseQuery = '';
+    }
+
+    // Sale transactions
+    let saleQuery = `
       SELECT 
-        'Sale' AS TransactionType,
-        s.SaleDate AS TransactionDate,
-        s.SaleID AS TransactionID,
-        a.AccountName AS Account,
-        pr.ProductName AS ProductName,
-        sd.Quantity,
-        sd.SalePrice AS Price,
-        s.TotalAmount
+        CONVERT(VARCHAR, s.SaleDate, 23) AS date,
+        'Sale' AS type,
+        s.VoucherNo,
+        a.AcctName AS accountName,
+        0 AS Debit,
+        sd.SalePrice * sd.Quantity AS Credit,
+        'Sale of ' + prd.PrdName AS description
       FROM Sales s
-      JOIN Accounts a ON s.CustomerID = a.AccountID
       JOIN SaleDetails sd ON s.SaleID = sd.SaleID
-      JOIN Products pr ON sd.PrdID = pr.PrdID
-      WHERE s.CompID = @compID
-        AND s.SaleDate BETWEEN @startDate AND @endDate
+      JOIN Accounts a ON s.CustomerID = a.AcctID
+      JOIN Products prd ON sd.PrdID = prd.PrdID
+      WHERE s.CompID = :compID
+        AND CAST(s.SaleDate AS DATE) BETWEEN :startDate AND :endDate
     `;
 
-    // Execute queries
-    const [purchases] = await sequelize.query(purchasesQuery, {
-      replacements: { 
-        compID: CompID,
-        startDate: startDate,
-        endDate: endDate 
-      },
-      type: sequelize.QueryTypes.SELECT
-    });
+    // Only include sales if filter allows
+    if (filterType !== 'all' && filterType !== 'sale') {
+      saleQuery = '';
+    }
 
-    const [sales] = await sequelize.query(salesQuery, {
-      replacements: { 
-        compID: CompID,
-        startDate: startDate,
-        endDate: endDate 
-      },
-      type: sequelize.QueryTypes.SELECT
-    });
+    // Combine all queries with UNION ALL
+    let fullQuery = accountDetailsQuery;
+    
+    if (purchaseQuery) {
+      fullQuery += ` UNION ALL ${purchaseQuery}`;
+    }
+    
+    if (saleQuery) {
+      fullQuery += ` UNION ALL ${saleQuery}`;
+    }
 
-    // Combine and sort results
-    const transactions = [...purchases, ...sales]
-      .sort((a, b) => new Date(a.TransactionDate) - new Date(b.TransactionDate));
+    fullQuery += ` ORDER BY date, VoucherNo`;
 
-    // Calculate totals
-    const totals = {
-      purchaseTotal: purchases.reduce((sum, t) => sum + parseFloat(t.TotalAmount), 0),
-      saleTotal: sales.reduce((sum, t) => sum + parseFloat(t.TotalAmount), 0),
-      netTotal: purchases.reduce((sum, t) => sum + parseFloat(t.TotalAmount), 0) - 
-               sales.reduce((sum, t) => sum + parseFloat(t.TotalAmount), 0)
+    const replacements = { 
+      compID, 
+      startDate, 
+      endDate,
+      ...(filterType !== 'all' && { filterType })
     };
 
-    res.status(200).json({
-      success: true,
-      data: transactions,
-      totals,
-      counts: {
-        purchases: purchases.length,
-        sales: sales.length,
-        total: transactions.length
-      }
+    const transactions = await sequelize.query(fullQuery, {
+      replacements,
+      type: sequelize.QueryTypes.SELECT
     });
 
+    res.status(200).json(transactions);
   } catch (error) {
-    console.error('Daybook error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error generating daybook',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    console.error('Error fetching daybook:', error);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: error.message
     });
   }
 };
 
-module.exports = { getDaybook };
+module.exports = {
+  getDaybook
+};
