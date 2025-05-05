@@ -190,6 +190,52 @@ const getDayBook = async (req, res) => {
   }
 };
 
+const getDayBookReport = async (req, res) => {
+  try {
+    const { CompID, StartDate, EndDate } = req.body;
+    
+    const [purchases] = await sequelize.query(
+      `SELECT 
+        'Purchase' AS Type,
+        pur.PurchaseDate AS Date,
+        pur.TotalAmount,
+        a.AcctName AS Party,
+        p.PrdName,
+        pur.Quantity
+       FROM Purchases pur
+       JOIN Accounts a ON pur.SupplierID = a.AcctID
+       JOIN Products p ON pur.PrdID = p.PrdID
+       WHERE pur.CompID = :CompID
+         AND pur.PurchaseDate BETWEEN :StartDate AND :EndDate`,
+      { replacements: { CompID, StartDate, EndDate } }
+    );
+    
+    const [sales] = await sequelize.query(
+      `SELECT 
+        'Sale' AS Type,
+        s.SaleDate AS Date,
+        s.TotalAmount,
+        a.AcctName AS Party,
+        p.PrdName,
+        s.Quantity
+       FROM Sales s
+       JOIN Accounts a ON s.CustomerID = a.AcctID
+       JOIN Products p ON s.PrdID = p.PrdID
+       WHERE s.CompID = :CompID
+         AND s.SaleDate BETWEEN :StartDate AND :EndDate`,
+      { replacements: { CompID, StartDate, EndDate } }
+    );
+    
+    const result = [...purchases, ...sales].sort((a, b) => new Date(a.Date) - new Date(b.Date));
+    
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Day book error:', error);
+    res.status(500).json({ message: 'Error generating day book' });
+  }
+};
+
+
 module.exports = {
   addCompany,
   //loginCompany,
@@ -197,5 +243,6 @@ module.exports = {
   getCompanyByID,
   editCompanyInfo,
   getCompanyStock,
-  getDayBook
+  getDayBook,
+  getDayBookReport
 };
